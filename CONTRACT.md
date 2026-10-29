@@ -1,73 +1,20 @@
-# LeanMoE — Build Contract
+# LeanMoE — Repo Contract
 
-Single-machine MoE expert prefetching: predict which expert is needed next
-and load it from disk into RAM *before* it's needed, overlapping disk I/O
-with compute instead of stalling on every cache miss.
+Single-machine MoE expert caching and prefetching, with an adaptive-RAM demo: cut the memory budget mid-generation and keep generating. The engine is prior work ported from ExpertRelay; see the README for exactly what is ported and what is new.
 
-## Ownership
+## Layout
 
-- src/ — Claude (chat session). Model loading, expert cache, predictor, prefetch scheduler.
-- eval/ — GPT Plus (relayed by Abdullah). Test prompts, timing/RAM measurement, baseline-vs-predictive comparison script, robustness prompt set.
-- Nobody edits outside their own folder without flagging it in this file first.
-- configs/ and README.md: new top-level items added during the ExpertRelay port (2026-10-29). Not owned by src/ or eval/. configs/ holds the engine's runtime configs, prompt set and prefetch calibrations; README.md documents setup, including LEANMOE_MODELS_ROOT for the external model store.
+- `src/engine/` — engine ported from ExpertRelay. Every file keeps its `# Adapted from ExpertRelay` header. Changes to ported behavior get a DECISIONS.md entry.
+- `src/synthetic_moe.py` — toy fallback. Always described as toy-only; never cited as real-model evidence.
+- `eval/adaptive_demo.py` — the adaptive-RAM demo and fixed-cache comparison.
+- `eval/compare_artifacts.py` — standard-library-only comparison of two saved runs.
+- `configs/` — engine runtime configs, prompt set and prefetch calibrations.
+- `results/` — evidence files, indexed in `results/EVIDENCE.md`.
+- `test_load.py` — the abandoned OLMoE load test, kept for the record (see DECISIONS.md).
 
-## Interfaces (the contract between src/ and eval/)
+## Rules
 
-### src/engine.py exposes:
-
-```python
-class LeanMoEEngine:
-    def __init__(self, model_name: str, mode: str, ram_budget_experts: int):
-        """
-        mode: "naive" (load expert from disk only on demand, blocking)
-              or "predictive" (prefetch likely-next expert in background)
-        ram_budget_experts: max experts held in RAM at once
-        """
-
-    def generate(self, prompt: str, max_new_tokens: int = 20) -> GenResult:
-        """Runs one prompt through the model. Returns timing + text."""
-
-
-@dataclass
-class GenResult:
-    text: str
-    total_time_s: float
-    stall_time_s: float       # time spent blocked waiting on disk load
-    experts_loaded: int       # total disk loads during this generation
-    cache_hits: int           # times the needed expert was already in RAM
-    cache_misses: int         # times it had to be loaded (blocking or prefetched)
-    peak_ram_mb: float
-```
-
-### eval/ calls src/engine.py only through LeanMoEEngine and GenResult.
-It never reaches into internals (cache dict, scheduler thread, etc).
-
-### eval/ provides back to src/ / run.py:
-
-- eval/test_cases.py — TEST_PROMPTS: list[str] (~30-50 prompts, varied topics so different experts activate)
-- eval/robustness_cases.py — ROBUSTNESS_PROMPTS: list[str] (10-15 edge cases: very long prompts, rapid topic switching, repeated prompts)
-- eval/metrics.py — run_comparison(engine_naive, engine_predictive, prompts) -> ComparisonResult, producing the results table (avg stall time, tokens/sec, peak RAM, cache hit rate) for both modes
-- eval/log_experiment(config: dict, result: ComparisonResult) — appends one row to results/log.csv
-
-## Data flow
-
-```
-run.py
-  → loads eval/test_cases.py prompts
-  → builds two LeanMoEEngine instances (naive, predictive) from src/engine.py
-  → eval/metrics.run_comparison(...) drives both engines, times them
-  → prints results table to terminal (demo-ready)
-  → eval/log_experiment(...) appends to results/log.csv
-```
-
-## What "predictive" must do differently from "naive"
-
-- Naive: on a cache miss, block, load expert from disk, then compute.
-- Predictive: while computing with the current expert, look at routing signal (or a simple heuristic/learned predictor) to guess the next likely expert, and start loading it on a background thread now, so it's hopefully ready by the time it's needed.
-
-## Model
-
-Start with allenai/OLMoE-1B-7B-0924 if it loads on 8GB tonight. Fallback: a
-small synthetic MoE (hand-built, 4-8 tiny "expert" weight files) if the real
-model doesn't fit — proves the mechanism even if not a production model.
-This gets decided after tonight's load test, logged in DECISIONS.md.
+- **Evidence first.** Every number in the README or a demo comes from a committed file in `results/` or is labelled as historical. Fresh and historical measurements stay in separate sections.
+- **Say what was tested, no more.** Token-id matches are stated for the tested prompt and configuration only. The fixed-cache result is a startup refusal under a smaller configured budget, not an out-of-memory crash.
+- **Model stores stay outside the repo.** They are found through `LEANMOE_MODELS_ROOT`. No weights, checkpoints or generated expert files are committed.
+- **Decisions get logged** in DECISIONS.md: what was chosen, why, and what was rejected.

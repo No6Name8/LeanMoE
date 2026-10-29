@@ -22,3 +22,6 @@ experts/
 
 # Local model stores (configured via LEANMOE_MODELS_ROOT, never committed)
 models/
+
+# Scratch file the adaptive demo rewrites while it runs
+results/adaptive_budget.txt
