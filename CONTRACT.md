@@ -6,8 +6,9 @@ Single-machine MoE expert caching and prefetching, with an adaptive-RAM demo: cu
 
 - `src/engine/` — engine ported from ExpertRelay. Every file keeps its `# Adapted from ExpertRelay` header. Changes to ported behavior get a DECISIONS.md entry.
 - `src/synthetic_moe.py` — toy fallback. Always described as toy-only; never cited as real-model evidence.
-- `eval/adaptive_demo.py` — the adaptive-RAM demo and fixed-cache comparison.
-- `eval/compare_artifacts.py` — standard-library-only comparison of two saved runs.
+- `eval/adaptive_demo.py` — the adaptive-RAM demo and the oversized fixed-cache startup example.
+- `eval/compare_artifacts.py` — standard-library-only strict check of an uncut and a cut saved run.
+- `tests/` — standard-library regression tests for the checker (`python -m unittest discover -s tests`).
 - `configs/` — engine runtime configs, prompt set and prefetch calibrations.
 - `results/` — evidence files, indexed in `results/EVIDENCE.md`.
 - `test_load.py` — the abandoned OLMoE load test, kept for the record (see DECISIONS.md).

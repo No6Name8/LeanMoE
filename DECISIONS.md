@@ -38,12 +38,12 @@ Format: **Decision** — what we chose. **Why** — reasoning. **Rejected** — 
 **Rejected:** Running the engine as a subprocess and writing the file from outside (no way to see token progress from outside the process).
 
 ## Fixed-cache comparison
-**Decision:** The naive comparison is a fresh run with a fixed 1.5 GB cache under the cut 2.5 GB budget. The memory guard refuses it at startup.
-**Why:** A fixed cache cannot shrink, so under a smaller budget its only option is to refuse.
-**Rejected:** Calling the refusal an out-of-memory crash. The guard compares an estimate (3.48 GB) with the configured budget (2.50 GB); about 2.7 GB was actually free when it ran.
+**Decision:** Show a fresh run with an oversized fixed cache (1.5 GB) under the cut 2.5 GB budget. The memory guard refuses it at startup.
+**Why:** It illustrates that a cache sized for the larger budget can't be kept when the budget shrinks; the adaptive run shrinks instead.
+**Rejected:** Calling the refusal an out-of-memory crash (the guard compares its 3.48 GB estimate with the 2.50 GB budget; 2.66 to 2.91 GB was actually free). Treating it as a speed baseline or as proof that fixed caching can't work: by the same estimate a fixed cache of up to about 0.51 GB fits under 2.5 GB, and that was not run. (Corrected 2026-10-29 after the independent review; the first version of this entry said a fixed cache's only option is to refuse.)
 
 ## Correctness check for the adaptive demo
-**Decision:** Strict paired check (`eval/adaptive_demo.py --compare`): two fresh runs that record all settings (store, quantization, prompt token ids, decoding, token limit, starting budget and cache, kernel, prefetch settings, calibration). The check passes only if the settings are identical apart from the cut schedule, both runs finish every token without error, and the full token-id lists match.
+**Decision:** Strict paired check (`eval/compare_artifacts.py`, also behind `eval/adaptive_demo.py --compare`): two fresh runs that record all settings (store, quantization, prompt token ids, decoding, token limit, starting budget and cache, kernel, prefetch settings, calibration). After the independent review it also requires distinct files, exactly one uncut reference and one scheduled cut inside the sequence that lowered the budget and recorded a cache shrink, complete token lists and logs, valid token ids and setting values, and it reports malformed files as FAIL instead of crashing. 37 standard-library regression tests cover these rules (`tests/test_compare_artifacts.py`).
 **Why:** "Outputs don't depend on cache size" was a claim in ExpertRelay's docstring, not something we had measured.
 **Result:** PASS. Identical generated token ids, all 80, for this tested prompt and configuration (results/adaptive_demo_20261029-205033.json uncut, results/adaptive_demo_20261029-205224.json cut). The pre-cut cache differed (120 vs 112 experts) because LiveBudget also caps it by free RAM at the first token. An earlier cut run (results/adaptive_demo_20261029-200451.json) has the same token ids, but it predates settings recording, so it counts only as supplementary evidence.
 **Rejected:** Generalizing this into a correctness guarantee. It is one prompt and one configuration.
@@ -52,3 +52,8 @@ Format: **Decision** — what we chose. **Why** — reasoning. **Rejected** — 
 **Decision:** requirements.txt lists the third-party imports actually found in the code. It was verified in a fresh virtual environment: clean install, `pip check` clean, all 35 project modules import, and both paired demo runs ran in that environment.
 **Why:** A judge will run `pip install -r requirements.txt` first.
 **Note:** The first fresh install failed only because its directory path was too long for Windows' path limit (torch has deeply nested files). The README tells Windows users to use a short path.
+
+## Budget versus measured memory (after the independent review)
+**Decision:** Document the budget as a target enforced against the engine's estimate, not a hard ceiling on measured memory, and report measured private memory and working set next to it.
+**Why:** In the fresh cut run the estimate after the cut was 2.499 GB against a 2.5 GB budget, but measured private memory was 2.659 GB (working set 2.118 to 2.143 GB). The reduced-budget review run repeated the pattern (2.2 GB budget, 2.354 GB private).
+**Rejected:** Changing the engine's estimate or adding measured-memory enforcement now. That is an engine change outside this submission's scope; the documentation states the gap instead.

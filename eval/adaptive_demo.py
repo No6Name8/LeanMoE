@@ -8,9 +8,11 @@ value, as if another program suddenly needed RAM. The engine's LiveBudget
 the expert cache. Every token is logged: budget, cache size, process RAM,
 free system RAM.
 
-Part 2 (fixed, the naive comparison): start a fresh engine run with the same
-fixed cache as part 1 started with, but under the cut budget. That run has no
-budget file, so it can't shrink: the engine's memory guard refuses to start it.
+Part 2 (oversized fixed cache): start a fresh engine run with the same fixed
+cache as part 1 started with, but under the cut budget, with no budget file.
+The engine's memory guard refuses it at startup because its estimate exceeds
+the budget. This is a startup refusal of an oversized configuration, not an
+out-of-memory crash and not a speed baseline; a smaller fixed cache can fit.
 
 How the budget file works (read from auto.py / generate.py, not assumed):
   - it holds one number: the memory budget in GB for the WHOLE engine process,
@@ -259,7 +261,7 @@ def main() -> None:
     for e in adaptive["budget_events"]:
         print(f"  budget event: {e}")
     refused = fixed["exit_code"] != 0
-    print(f"Fixed cache: {'refused to start' if refused else 'started'} "
+    print(f"Oversized fixed cache: {'refused at startup by the memory guard' if refused else 'started'} "
           f"({fixed['last_line'][:200]})")
     print(f"Generated text: {adaptive['generated_text'][:300]!r}")
     print(f"Full log: {out}")
