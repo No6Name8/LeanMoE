@@ -1,0 +1,18 @@
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets
+.env
+
+# Hugging Face caches
+.cache/
+huggingface/
+hf_cache/
+.huggingface/
