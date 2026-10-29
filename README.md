@@ -1,86 +1,26 @@
 # LeanMoE
 
-Run a mixture-of-experts (MoE) model on an 8 GB laptop by keeping only some experts in RAM, loading the rest from disk on demand, and prefetching the experts the router is likely to need next. This submission's new piece is an **adaptive-RAM demo**: the memory budget is cut while the model is generating, the expert cache shrinks between tokens, and generation carries on.
+A mixture-of-experts (MoE) model only uses a few of its experts for each token, so it doesn't need all its weights in RAM at once. LeanMoE runs Qwen1.5-MoE-A2.7B-Chat, whose int8 weights take 14.36 GB on disk, on a laptop with 8.30 GB of RAM: shared weights stay in memory, routed experts are read from the SSD when needed, a RAM cache keeps recently used experts, and a predictor starts reading the next layer's likely experts early.
 
-See [DECISIONS.md](DECISIONS.md) for the decisions log, [CONTRACT.md](CONTRACT.md) for repo rules, and [results/EVIDENCE.md](results/EVIDENCE.md) for the evidence files.
+This submission's addition is an **adaptive memory budget test on the real model**: the budget is cut while the model is generating, the expert cache shrinks between tokens, and generation continues with the same output.
 
 ## Prior work: ExpertRelay
 
 The inference engine in `src/engine/` is **existing work**, ported from ExpertRelay, a private research project by Abdullah Ali Alanazi (2026). Concept note: [doi:10.5281/zenodo.22980838](https://doi.org/10.5281/zenodo.22980838). Every ported file starts with `# Adapted from ExpertRelay (private research project, 2026)`.
 
-Ported, not written for this submission:
+From ExpertRelay: the int8 expert store format and readers, the numpy runtime with its fused int8 kernel, the expert cache, the prefetch predictor and its calibrations, the Manager, **LiveBudget** (which re-reads a budget file between tokens and resizes the cache) and the startup memory guard. Docstrings in `src/engine/` sometimes cite ExpertRelay's own docs, tests and benchmark files; those are not part of this repository.
 
-- **Engine:** the numpy Qwen-MoE runtime, int8 and int4 kernels and compute backends (`src/engine/runtime/`).
-- **Expert store format and readers:** `store.json`, `experts.bin` and `resident.bin`, with unbuffered disk reads (`src/engine/store/`).
-- **Expert cache:** slot cache with LRU eviction and resizing (`src/engine/cache/expert_cache.py`).
-- **Predictor:** the router-probability prefetch policy and its fitted calibrations (`src/engine/predictor/`, `configs/calibration/`).
-- **Manager:** machine profiling and automatic configuration (`src/engine/manager/`).
-- **LiveBudget:** re-reads a budget file between tokens and resizes the cache (`src/engine/runtime/auto.py`). The adaptive demo drives this existing mechanism; it did not add it.
-- **Memory guard:** refuses at startup a configuration whose estimated RAM exceeds the configured budget (`src/engine/memory_budget.py`).
+New in LeanMoE:
 
-## New in this submission
+- the port (imports, `LEANMOE_MODELS_ROOT`, optional MindSpore);
+- the adaptive-budget demo, its strict evidence checker and regression tests;
+- a prefetch on/off experiment on the Chat store;
+- a memory-accounting correction in the engine's estimate (see below);
+- the measurements in this README.
 
-- **The port:** imports moved to `src.engine`, model stores located through `LEANMOE_MODELS_ROOT`, and MindSpore made optional (the machine profile required it). Seven extra ExpertRelay files came along because the requested ones import them.
-- **Adaptive-RAM demo** (`eval/adaptive_demo.py`): cuts the budget mid-generation, logs cache size and RAM per token, records every setting, and runs the fixed-cache comparison.
-- **Artifact comparison** (`eval/compare_artifacts.py`): standard-library-only check of two saved runs.
-- **Synthetic MoE fallback** (`src/synthetic_moe.py`): 8 toy experts on disk. **It only illustrates disk-load versus RAM-hit cost on toy weights. It is not a model, it doesn't use LiveBudget, and it validates nothing about real-model performance.**
-- **Fresh measurements**, below.
+## Quick start
 
-## Fresh measurements (this submission, 2026-10-29)
-
-One 8 GB Windows laptop, Qwen1.5-MoE-A2.7B-Chat int8 store, numpy backend, fused int8 kernel, prefetch on, 80 tokens, 3.5 GB starting budget, 1.5 GB starting cache. Two runs made back to back from a fresh virtual environment, with all settings recorded and identical apart from the cut schedule.
-
-**Main result:** a scheduled budget reduction after token 20 shrank the expert cache, generation completed all 80 tokens without an error, and the generated token ids matched the uncut reference for this tested prompt and configuration.
-
-| | Uncut reference | Cut to 2.5 GB after token 20 |
-|---|---|---|
-| Evidence file | `results/adaptive_demo_20261029-205033.json` | `results/adaptive_demo_20261029-205224.json` |
-| Cache after the first token | 120 experts (1.041 GB) | 112 experts (0.971 GB) |
-| Cache after token 20 | 120 experts (1.041 GB) | 59 experts (0.512 GB), 47% fewer |
-| Process private memory, token 19 to 20 | 3.189 GB, unchanged | 3.120 GB to 2.659 GB, 0.461 GB (14.8%) less |
-| Tokens, errors | 80 of 80, none | 80 of 80, none |
-| Generated token ids | identical in both runs (80 of 80) | |
-
-- **Token ids matched** for this tested prompt and configuration. It is one prompt, one configuration and greedy decoding, not a general correctness guarantee.
-- **Starting cache sizes differed** because available system RAM differed. Both runs were configured for a 1.5 GB cache. LiveBudget applies the starting budget after the first token and also caps the cache by the RAM free at that moment, which varied between the runs. This is not the scheduled cut.
-- **Cache reduction is not total memory saving.** The cache fell 47%; the whole process's private memory fell 14.8%, because the rest of the process (about 2 GB) doesn't shrink.
-- **Timing:** tokens 21 to 80 averaged 0.556 s per token uncut and 0.637 s cut. That is one noisy paired observation, not an established resizing penalty: the runs started with different cache sizes, and time per token varied by about 0.12 s (standard deviation) within the uncut run alone.
-- **Fixed-cache example:** a fresh run with an *oversized* fixed cache (1.5 GB) under the 2.5 GB budget was refused at startup by the memory guard, whose estimate was 3.48 GB. It never generated and went through no live cut. It is not an out-of-memory crash (2.66 to 2.91 GB of RAM was free when it ran), not a speed baseline, and not evidence that fixed caching can't work: by the same estimate, a fixed cache of up to about 0.51 GB fits under 2.5 GB. That smaller fixed cache was not run.
-- **Port check:** the ported engine generated the same 32 token ids as the original ExpertRelay code on the same store, prompt and settings.
-
-Supplementary runs, not part of the primary pair: an earlier cut run (`results/adaptive_demo_20261029-200451.json`, recorded before settings were saved; 165 to 59 experts) and a reduced-budget run made during review (`results/adaptive_demo_20261029-211301.json`, 2.6 GB cut to 2.2 GB, 0.6 GB starting cache; 57 to 24 experts, 80 of 80 tokens, the same 80 token ids). See [results/EVIDENCE.md](results/EVIDENCE.md).
-
-## Memory: what the budget does and doesn't guarantee
-
-The budget is a **target enforced against the engine's own estimate**, not a hard ceiling on measured process memory. At startup the memory guard refuses a configuration whose estimated RAM exceeds the budget. During a run, LiveBudget sizes the cache as the budget minus the estimated rest of the process (1.987 GB for this store and settings), further capped by free RAM. Nothing measures the process and stops it at the budget.
-
-Two measured quantities, both in decimal GB (1 GB = 10^9 bytes), sampled after every token:
-
-- **Private memory:** what the process has committed, whether or not it is in physical RAM. Windows charges it against the commit limit (RAM plus page file).
-- **Working set:** the part currently in physical RAM. Windows can trim it.
-
-| Cut run | Budget | Engine estimate | Measured private memory | Measured working set |
-|---|---|---|---|---|
-| Tokens 1 to 19, after the token-1 resize | 3.5 GB | 2.958 GB | up to 3.126 GB | up to 2.577 GB |
-| Tokens 20 to 80 | 2.5 GB | 2.499 GB | 2.659 to 2.660 GB | 2.118 to 2.143 GB |
-
-After the cut the estimate met the 2.5 GB target, but measured private memory was 2.659 GB, 0.159 GB over it. The working set stayed under it. The reduced-budget supplementary run shows the same pattern: 2.2 GB target, 2.354 GB private memory after its cut.
-
-**Observed memory use at the default demo settings** (3.5 GB starting budget, 1.5 GB starting cache): private memory up to 3.19 GB and working set up to 2.67 GB in the uncut run. These are per-token samples; the peak during the prompt's first pass isn't captured.
-
-**Headroom guidance, not a guarantee.** Two different limits apply on Windows. Commit headroom (commit limit minus memory already committed) must cover the process's private memory, or allocations fail. Available physical RAM decides how large LiveBudget lets the cache grow and how much the system pages. Check both before a run, and leave margin above the figures above; other programs' memory use changes during a run. If headroom is short, lower `--start-gb`, `--start-cache-gb` and `--cut-gb` (the reduced-budget run above used 2.6 GB, 0.6 GB and 2.2 GB).
-
-```
-powershell -Command "Get-Counter '\Memory\Committed Bytes','\Memory\Commit Limit','\Memory\Available MBytes'"
-```
-
-## Historical ExpertRelay measurement
-
-One run of the **original ExpertRelay code**, earlier the same evening, on the same store with a 1.5 GB cache: first token 22.1 s, decode 0.78 tokens/s, peak RAM 3,094 MB. ExpertRelay's own older benchmark results are not reproduced or relied on here.
-
-## Reproducing
-
-Install (tested in a fresh virtual environment on Windows with Python 3.13):
+Tested on Windows with Python 3.13. Use a short directory path (or enable long paths): torch has deeply nested files and failed to install into a long path.
 
 ```
 python -m venv venv
@@ -88,33 +28,91 @@ venv\Scripts\activate
 python -m pip install -r requirements.txt
 ```
 
-On Windows, use a short directory path or enable long paths: torch contains deeply nested files, and an install into a long path failed with a path-length error during testing.
-
-**1. Check the saved evidence, no model needed.** Standard library only. It reads the committed JSON files; it does not rerun inference, so it is not an independent reproduction.
+**Check the saved evidence (no model needed, standard library only).** This reads the committed result files; it does not rerun inference.
 
 ```
-python eval/compare_artifacts.py results/adaptive_demo_20261029-205033.json results/adaptive_demo_20261029-205224.json
-```
-
-PASS requires two distinct files: exactly one uncut reference and one run with a scheduled cut inside the sequence that lowered the budget, with a recorded cache shrink at that token. Both runs must have every requested token (token-id list, reported count and logs all complete), valid token ids, no recorded error, all required settings with valid values, identical settings, and identical token ids. Anything else, including unreadable or malformed files, is a FAIL with exit code 1. The regression tests for these rules use only the standard library:
-
-```
+python eval/compare_artifacts.py results/adaptive_demo_20261029-220246.json results/adaptive_demo_20261029-220417.json
 python -m unittest discover -s tests -v
 ```
 
-**2. Synthetic fallback, no model needed.** Toy weights only; see the warning above.
+**Toy fallback (no model needed).** `src/synthetic_moe.py` writes 8 tiny experts to disk and times disk loads against cache hits. It is not a model, doesn't use the engine or LiveBudget, and says nothing about real-model performance.
 
 ```
 python -m src.synthetic_moe
 ```
 
-**3. Real-model adaptive demo, needs the external store.** Real-model inference needs the Qwen1.5-MoE-A2.7B-Chat int8 store, about 14 GB, which is not in this repo. It was built by ExpertRelay's store builder, which is not included here and needs the 27 GB original checkpoint. With the store in a folder named `qwen1.5-moe-a2.7b-chat-int8` inside some directory:
+**Real model (needs the external store).** The Qwen1.5-MoE-A2.7B-Chat int8 store (14.36 GB) is not in this repository, and the ExpertRelay store builder that produced it is not included. With the store in a folder named `qwen1.5-moe-a2.7b-chat-int8` inside some directory:
 
 ```
 set LEANMOE_MODELS_ROOT=C:\path\to\that\directory
 python -m eval.adaptive_demo --cut-at 0
 python -m eval.adaptive_demo --cut-at 20
 python -m eval.adaptive_demo --compare results\<uncut run>.json results\<cut run>.json
+python -m eval.prefetch_ablation --cache-gb 1.1
 ```
 
-Each run takes about two to three minutes on this laptop and writes a new `results/adaptive_demo_<timestamp>.json`. Check commit headroom and free RAM first (see the memory section above); at these defaults the process committed up to 3.19 GB. If `LEANMOE_MODELS_ROOT` is unset, the engine looks in `models/` at the repo root, which is gitignored.
+Each demo run takes two to three minutes here; the prefetch experiment takes about 20 minutes. At the demo's defaults the process's sampled private memory peaked at 3.45 GB. Check Windows commit headroom and free physical RAM before running (see [Limitations](#limitations)); lower `--start-gb`, `--start-cache-gb` and `--cut-gb` if headroom is short.
+
+## Verified results
+
+All on one laptop (Intel Core i5-12450H, 8.30 GB RAM, NVMe SSD), int8 Chat store, numpy backend, fused int8 kernel, greedy decoding, 2026-10-29. Details, raw files and the earlier runs are in [results/EVIDENCE.md](results/EVIDENCE.md).
+
+**1. The budget can be cut mid-generation.** Primary pair, made after the accounting correction; only the cut schedule differs.
+
+| | Uncut | Cut to 2.5 GB after token 20 |
+|---|---|---|
+| Evidence file | `adaptive_demo_20261029-220246.json` | `adaptive_demo_20261029-220417.json` |
+| Expert cache before token 20 | 142 experts (1.23 GB) | 127 experts (1.10 GB) |
+| Expert cache after token 20 | 142 experts | 37 experts (0.32 GB) |
+| Measured private memory after token 20 | 3.381 GB | 2.467 to 2.468 GB |
+| Tokens, errors | 80 of 80, none | 80 of 80, none |
+
+The 80 generated token ids are identical between the two runs, for this one prompt and configuration. The cache sizes before the cut differ because LiveBudget also caps the cache by free RAM when it applies the starting budget, and free RAM differed between the runs. A second cut, 3.0 GB to 2.7 GB, shrank the cache from 87 to 60 experts with the same 80 token ids.
+
+**2. The memory estimate now covers what the budget is compared against.** The engine sizes the cache from an estimate of the rest of the process. That estimate used a fixed 200 MiB interpreter baseline, but importing numpy commits about 34 MB per OpenBLAS thread (381 MB with 12 threads here), almost none of it in physical RAM. The baseline is now the larger of the constant and the private memory measured when the engine is imported (401 MB here).
+
+| Cut run | Budget after cut | Measured private memory after cut | Cache after cut |
+|---|---|---|---|
+| Before the correction | 2.5 GB | 2.660 GB (0.160 over) | 59 experts |
+| After | 2.5 GB | 2.468 GB (0.032 under) | 37 experts |
+| Before the correction | 2.2 GB | 2.354 GB (0.154 over) | 24 experts |
+| After | 2.7 GB | 2.668 GB (0.032 under) | 60 experts |
+
+The price is a smaller cache at the same budget (37 instead of 59 experts at 2.5 GB). Decode time for tokens 21 to 80 was 0.626 s per token after the correction and 0.637 before, a difference smaller than the per-token spread (standard deviation about 0.06 s). Memory was sampled once per token in the per-token log and every 50 ms by a background sampler; sampled peaks can miss shorter allocations. The budget is still a target the engine plans against, not a hard ceiling: nothing stops the process if it goes over.
+
+**3. Adaptive prefetching helps decode on the Chat store when the cache holds a token's experts.** Three short prompts chosen in advance, 48 tokens, prefetch on or off with everything else matched, two runs each in alternating order, one process at a time.
+
+| Cache | Prefetch on, tokens/s | Prefetch off, tokens/s | Matched pairs where on was faster |
+|---|---|---|---|
+| 1.1 GB (126 experts) | mean 1.657, range 1.473 to 1.803 | mean 1.550, range 1.414 to 1.637 | 6 of 6 |
+| 0.6 GB (69 experts), exploratory | mean 1.281, range 0.803 to 1.656 | mean 0.946, range 0.425 to 1.437 | 5 of 6 |
+
+At 1.1 GB, prefetch was faster by 4.3%, 8.9% and 7.3% on the three prompts, and for each prompt both prefetch runs beat both no-prefetch runs. Token ids were identical across all runs of each prompt. The 0.6 GB run was noisy: compute time per token swung from 0.13 to 0.97 s while other programs used the machine, and a 69-expert cache is smaller than the 96 experts one token uses, so the cache alone got no hits. The default (adaptive prefetch on) is unchanged. An earlier ExpertRelay benchmark on the base store, where the cache alone was fastest, did not reproduce here.
+
+**Not shown:** no speedup against a non-caching baseline was measured for this submission. ExpertRelay's own historical comparisons (for example against memory-mapping) used the base store and older code and are not repeated here.
+
+## Limitations
+
+- **One machine, few prompts.** Output equality was tested on one demo prompt (and three prefetch prompts) with greedy decoding; it is not a general correctness guarantee. Timings vary with background load.
+- **The budget is a planning target.** LiveBudget and the startup guard work from an estimate. After the correction, measured private memory stayed under the cut budget in every per-token sample after each cut, and the 50 ms sampler's loading and prefill peaks stayed under the starting budget, but nothing enforces it and short spikes between samples aren't seen.
+- **Two Windows memory limits.** Commit headroom (commit limit minus memory already committed) must cover the process's private memory, or allocations fail. Free physical RAM decides how large LiveBudget lets the cache grow and how much the system pages. Check both:
+
+  ```
+  powershell -Command "Get-Counter '\Memory\Committed Bytes','\Memory\Commit Limit','\Memory\Available MBytes'"
+  ```
+
+- **The oversized fixed-cache example is a startup refusal.** Each demo run also starts a fresh run whose fixed cache is too large for the cut budget; the memory guard refuses it on its estimate. That is not an out-of-memory crash, not a speed baseline, and not evidence that fixed caching can't work: a fixed cache sized for the smaller budget would start.
+- **The model store is external** and can't be rebuilt from this repository.
+- **Windows only** for the real model: the unbuffered expert reader uses Win32 APIs.
+
+## Repository layout
+
+- `src/engine/` — engine ported from ExpertRelay (see above). LeanMoE's changes are marked `LeanMoE change` in the code.
+- `src/synthetic_moe.py` — toy fallback.
+- `eval/adaptive_demo.py` — budget-cut demo and the oversized fixed-cache example.
+- `eval/compare_artifacts.py` — standard-library checker for an uncut and a cut run.
+- `eval/prefetch_ablation.py` — prefetch on/off experiment.
+- `tests/` — standard-library regression tests.
+- `configs/` — engine configs, prompt set and prefetch calibrations. `runtime.json` (the engine's default config) and `runtime_cache.json` point at the base store, which these demos don't use.
+- `results/` — raw result files, indexed in [results/EVIDENCE.md](results/EVIDENCE.md).
+- [DECISIONS.md](DECISIONS.md) — what was decided, why, and what was rejected.

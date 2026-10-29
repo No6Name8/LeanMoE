@@ -99,7 +99,7 @@ class DriveInfo:
 class SoftwareInfo:
     platform: str
     python_version: str
-    mindspore_version: str | None  # None when MindSpore isn't installed (LeanMoE runs numpy-only)
+    mindspore_version: str | None  # LeanMoE change: None when MindSpore isn't installed (LeanMoE runs numpy-only)
 
 
 @dataclass(frozen=True)
@@ -307,6 +307,7 @@ def measure_software() -> SoftwareInfo:
 
 
 def _installed_version(package: str) -> str | None:
+    # LeanMoE change: a missing package is None instead of an error
     try:
         return importlib.metadata.version(package)
     except importlib.metadata.PackageNotFoundError:

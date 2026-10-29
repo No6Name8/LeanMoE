@@ -41,7 +41,7 @@ from pathlib import Path
 import numpy as np
 
 from src.engine import REPO_ROOT
-from src.engine.benchmarking import peak_process_rss_mb
+from src.engine.benchmarking import peak_process_rss_mb, process_private_bytes
 from src.engine.cache.expert_cache import CachedExpertSource, slots_for
 from src.engine.manager.backend_selection import BackendChoice, select_backend
 from src.engine.manager.profile import collect_machine_profile, device_read_bytes, measure_memory
@@ -80,6 +80,18 @@ SOURCES: dict[str, type[ExpertSource]] = {
 # Interpreter + numpy + tokenizers, measured on the dev machine before any
 # weights are loaded (~150 MB), rounded up.
 PROCESS_BASELINE_BYTES = 200 * 2**20
+# LeanMoE change: the committed memory this process already holds when this
+# module is imported, before it can load any weights. It replaces the fixed
+# baseline when larger. numpy's OpenBLAS commits a buffer per BLAS thread at
+# import (about 34 MB each; 12 threads gave 381 MB private on the LeanMoE dev
+# machine, with almost none of it in the working set), which the fixed
+# baseline missed. Measured, not assumed, so it follows the machine's thread
+# count. See DECISIONS.md, "Memory accounting".
+IMPORT_PRIVATE_BYTES = process_private_bytes()
+
+
+def process_baseline_bytes() -> int:
+    return max(PROCESS_BASELINE_BYTES, IMPORT_PRIVATE_BYTES)
 # Importing MindSpore and running a first op: measured 195 MB on the dev
 # machine, rounded up. Only paid when the MindSpore backend is selected.
 MINDSPORE_BACKEND_BYTES = 256 * 2**20
@@ -123,7 +135,7 @@ class RuntimeConfig:
             max_seq=d["max_seq"],
             max_new_tokens=d["max_new_tokens"],
             prompts_file=REPO_ROOT / d["prompts_file"],
-            store_dir=MODELS_ROOT / d["store_dir"],  # store names resolve under LEANMOE_MODELS_ROOT
+            store_dir=MODELS_ROOT / d["store_dir"],  # LeanMoE change: store names resolve under LEANMOE_MODELS_ROOT
             expert_cache_gb=d.get("expert_cache_gb", 0.0),
             prefetch=d.get("prefetch", False),
             prefetch_k=d.get("prefetch_k", 8),
@@ -162,7 +174,8 @@ def estimate_ram_bytes(
 ) -> int:
     """Upper-bound estimate of this process's RAM for a run, used to enforce
     the budget BEFORE loading anything. Every term is computed from real
-    shapes, none are guessed except the fixed interpreter baseline."""
+    shapes, except the interpreter baseline (measured at import, see
+    process_baseline_bytes) and the fixed backend and kernel allowances."""
     store_dir = Path(store_dir)
     entries = read_resident_index(store_dir / RESIDENT_INDEX)
     resident = 0 if source == "mmap" else sum(e.region_size for e in entries if e.name != EMBEDDING)
@@ -182,7 +195,7 @@ def estimate_ram_bytes(
     # scores [heads, n, n], and logits for the last position only
     activations = max_seq * widest * 4 * 6 + config.num_heads * max_seq * max_seq * 4 + tallest * 4
     return (
-        PROCESS_BASELINE_BYTES
+        process_baseline_bytes()
         + (MINDSPORE_BACKEND_BYTES if backend == "mindspore" else 0)
         + (FUSED_KERNEL_BYTES if backend == "numpy" and int8_kernel == "fused" else 0)
         + resident

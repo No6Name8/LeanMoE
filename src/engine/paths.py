@@ -14,10 +14,10 @@ from pathlib import Path
 
 from src.engine import REPO_ROOT
 
-# Model stores are multi-GB and are never shipped in the repo. LEANMOE_MODELS_ROOT
+# LeanMoE change: model stores are multi-GB and are never shipped in the repo. LEANMOE_MODELS_ROOT
 # points at the local directory that holds them (e.g. ExpertRelay's models/ folder).
 MODELS_ROOT: Path = Path(os.environ.get("LEANMOE_MODELS_ROOT", REPO_ROOT / "models"))
 DEFAULT_EXPERT_STORE_DIR: Path = MODELS_ROOT / "qwen1.5-moe-a2.7b-int8"
 BENCHMARK_RESULTS_DIR: Path = REPO_ROOT / "results"
-# Fitted prefetch calibrations ship with the repo, next to the configs that use them.
+# LeanMoE change: fitted prefetch calibrations ship with the repo, next to the configs that use them.
 CALIBRATION_DIR: Path = REPO_ROOT / "configs" / "calibration"

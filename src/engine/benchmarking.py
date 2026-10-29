@@ -68,6 +68,13 @@ def git_is_dirty() -> bool | None:
         return None
 
 
+def process_private_bytes() -> int:
+    """Memory the CURRENT process has committed: private bytes on Windows
+    (what the commit limit is charged for, touched or not), RSS elsewhere."""
+    info = psutil.Process().memory_info()
+    return getattr(info, "private", None) or info.rss
+
+
 def peak_process_rss_mb() -> float:
     """Peak memory used by the CURRENT process so far, in MB.
 

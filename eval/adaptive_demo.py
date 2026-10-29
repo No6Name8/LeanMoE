@@ -39,6 +39,7 @@ import argparse
 import json
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -70,6 +71,36 @@ def process_mb() -> tuple[float, float]:
     return info.rss / 1e6, getattr(info, "private", info.rss) / 1e6
 
 
+SAMPLE_MS = 50
+
+
+class PhaseSampler(threading.Thread):
+    """Samples this process's private memory and working set every SAMPLE_MS,
+    keeping the sampled peak per phase (load, prefill, decode, resize). A
+    sampled peak can miss allocations shorter than the interval."""
+
+    def __init__(self) -> None:
+        super().__init__(daemon=True)
+        self.phase = "load"
+        self.peaks: dict[str, dict] = {}
+        self._stop = threading.Event()
+        self._proc = psutil.Process()
+
+    def run(self) -> None:
+        while not self._stop.is_set():
+            info = self._proc.memory_info()
+            p = self.peaks.setdefault(self.phase, {"samples": 0, "peak_private_gb": 0.0, "peak_working_set_gb": 0.0})
+            p["samples"] += 1
+            p["peak_private_gb"] = max(p["peak_private_gb"], getattr(info, "private", info.rss) / GB)
+            p["peak_working_set_gb"] = max(p["peak_working_set_gb"], info.rss / GB)
+            self._stop.wait(SAMPLE_MS / 1000)
+
+    def finish(self) -> dict:
+        self._stop.set()
+        self.join()
+        return {"interval_ms": SAMPLE_MS, "phases": self.peaks}
+
+
 def run_adaptive(args: argparse.Namespace) -> dict:
     rt = RuntimeConfig.load(CONFIG)
     rt = replace(
@@ -94,6 +125,8 @@ def run_adaptive(args: argparse.Namespace) -> dict:
     budget_file.write_text(f"{args.start_gb}\n")
 
     free_before = measure_memory().available_bytes
+    sampler = PhaseSampler()
+    sampler.start()
     t_load = time.perf_counter()
     model, info = load_model(store_dir, "cached", rt.max_seq, rt.memory_budget_gb, None, rt)
     load_s = time.perf_counter() - t_load
@@ -116,7 +149,10 @@ def run_adaptive(args: argparse.Namespace) -> dict:
         if args.cut_at > 0 and token == args.cut_at:
             budget_file.write_text(f"{args.cut_gb}\n")
             state["budget"] = args.cut_gb
+        # LiveBudget applies the starting budget after token 1 and the cut after cut_at
+        sampler.phase = "resize" if token == 1 or token == args.cut_at else "decode"
         live()
+        sampler.phase = "decode"
         now = time.perf_counter()
         ws, private = process_mb()
         row = {
@@ -138,12 +174,14 @@ def run_adaptive(args: argparse.Namespace) -> dict:
     error = None
     generated: list[int] = []
     steps = []
+    sampler.phase = "prefill"
     try:
         generated, steps = generate(model, prompt_ids, rt.max_new_tokens, rt.max_seq, between_tokens=between_tokens)
     except Exception as e:  # report it, don't hide it
         error = repr(e)
     finally:
         model.experts.close()
+        memory_samples = sampler.finish()
 
     store = json.loads((store_dir / "store.json").read_text(encoding="utf-8"))
     settings = {
@@ -187,6 +225,7 @@ def run_adaptive(args: argparse.Namespace) -> dict:
         "free_ram_before_load_gb": free_before / GB,
         "load_seconds": load_s,
         "base_ram_gb": facts.base_ram_bytes / GB,
+        "memory_samples": memory_samples,
     }
 
 
@@ -217,7 +256,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--start-gb", type=float, default=3.5, help="starting process budget (GB)")
     ap.add_argument("--cut-gb", type=float, default=2.5, help="budget after the cut (GB)")
-    ap.add_argument("--start-cache-gb", type=float, default=1.5, help="expert cache the run starts with")
+    ap.add_argument("--start-cache-gb", type=float, default=1.3, help="expert cache the run starts with (must fit the starting budget)")
     ap.add_argument("--cut-at", type=int, default=20, help="token after which the budget is cut; 0 = never (uncut reference)")
     ap.add_argument("--compare", nargs=2, type=Path, metavar=("A_JSON", "B_JSON"), default=None,
                     help="don't run: compare two adaptive_demo results (settings, completion, token ids)")
@@ -260,6 +299,10 @@ def main() -> None:
         print(f"Adaptive run ended after {adaptive['tokens_generated']} tokens, before the cut at {args.cut_at}.")
     for e in adaptive["budget_events"]:
         print(f"  budget event: {e}")
+    print(f"Sampled peaks every {adaptive['memory_samples']['interval_ms']} ms (can miss shorter allocations):")
+    for phase, p in adaptive["memory_samples"]["phases"].items():
+        print(f"  {phase:<8} private {p['peak_private_gb']:.3f} GB, working set {p['peak_working_set_gb']:.3f} GB "
+              f"({p['samples']} samples)")
     refused = fixed["exit_code"] != 0
     print(f"Oversized fixed cache: {'refused at startup by the memory guard' if refused else 'started'} "
           f"({fixed['last_line'][:200]})")

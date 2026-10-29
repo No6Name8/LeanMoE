@@ -89,6 +89,7 @@ def fast_quality_note() -> str:
 
 
 def calibration_for(store_dir: Path) -> Path | None:
+    # LeanMoE change: calibrations live in configs/calibration/, not benchmark results
     path = CALIBRATION_DIR / f"prefetch_calibration_{Path(store_dir).name}.json"
     return path if path.exists() else None
 
