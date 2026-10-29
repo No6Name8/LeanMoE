@@ -9,6 +9,7 @@ with compute instead of stalling on every cache miss.
 - src/ — Claude (chat session). Model loading, expert cache, predictor, prefetch scheduler.
 - eval/ — GPT Plus (relayed by Abdullah). Test prompts, timing/RAM measurement, baseline-vs-predictive comparison script, robustness prompt set.
 - Nobody edits outside their own folder without flagging it in this file first.
+- configs/ and README.md: new top-level items added during the ExpertRelay port (2026-10-29). Not owned by src/ or eval/. configs/ holds the engine's runtime configs, prompt set and prefetch calibrations; README.md documents setup, including LEANMOE_MODELS_ROOT for the external model store.
 
 ## Interfaces (the contract between src/ and eval/)
 

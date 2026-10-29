@@ -16,3 +16,9 @@ __pycache__/
 huggingface/
 hf_cache/
 .huggingface/
+
+# Generated synthetic expert weights (rebuild with src/synthetic_moe.py)
+experts/
+
+# Local model stores (configured via LEANMOE_MODELS_ROOT, never committed)
+models/

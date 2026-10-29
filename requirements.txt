@@ -1,0 +1,11 @@
+# src/engine (ported ExpertRelay runtime): third-party imports found in the code
+numpy>=2.2
+numba>=0.61        # int8/int4 fused kernels; loaded lazily, the blocked int8 kernel works without it
+psutil>=7.1
+tokenizers>=0.21
+jinja2>=3.1        # chat template rendering
+
+# src/synthetic_moe.py and test_load.py
+torch>=2.5
+transformers>=4.45 # test_load.py only
+accelerate>=1.0    # used by transformers for low_cpu_mem_usage loading in test_load.py
