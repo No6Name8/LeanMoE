@@ -38,7 +38,7 @@ def recorded_evidence(results: Path) -> list[dict]:
                 "value": (f"{c['settings']['start_budget_gb']} GB to {ev['budget_gb']} GB after token {ev['token']}: "
                           f"cache {ev['slots_before']} to {ev['slots_after']} experts, private memory "
                           f"{row['process_private_mb'] / 1000:.3f} GB after the cut; token ids identical to the "
-                          f"uncut run: {u['generated_ids'] == c['generated_ids']}"),
+                          f"uncut run: {'yes' if u['generated_ids'] == c['generated_ids'] else 'no'}"),
                 "files": [PRIMARY_UNCUT, PRIMARY_CUT],
             })  # fmt: skip
         except (KeyError, StopIteration, IndexError, TypeError):

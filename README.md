@@ -64,15 +64,23 @@ Each run writes a new `results\adaptive_demo_<timestamp>.json`. **To stop a run*
 
 ### Local dashboard (optional)
 
-A single page on this computer for running workloads and inspecting the engine: prompt, cached or memory-mapped mode, streamed output, live timing, token counts, process memory and expert-cache counters, cancel, a live budget change (real model, cached mode), and a one-after-the-other comparison of both modes with the same prompt and settings. It also lists the recorded benchmark figures, read from the committed result files and labelled as recorded. It is not a chatbot, and model output is labelled unverified. After running the setup script:
+A single page on this computer for running workloads on the engine. It is not a chatbot, and model output is labelled unverified. After running the setup script:
 
 ```
-.\.venv\Scripts\python.exe -m src.dashboard --open
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dashboard.ps1
 ```
 
-It opens http://127.0.0.1:8770 and listens on this computer only (127.0.0.1; there is no option to expose it). Stop it with Ctrl+C in the PowerShell window. Without the model store it still opens: it shows the recorded evidence and offers a **synthetic engine demonstration** (the tiny random-weight model; its output is meaningless token ids and is labelled as such). For the real model, set `$env:LEANMOE_MODELS_ROOT` (see Path 2) in the same window before starting it. One run at a time: a second run while one is active is refused. A run's first forward pass (prefill, about 10 s on the real model) can't be interrupted, so a cancel during it takes effect when it ends, and the page says so. Equations in model output are typeset with KaTeX, bundled in the repository (MIT license), with untrusted commands disabled.
+It opens http://127.0.0.1:8770 in the default browser and listens on this computer only (127.0.0.1; there is no option to expose it). Stop it with Ctrl+C in the PowerShell window. Add `-Port 8771` if 8770 is taken, or `-NoOpen` to skip opening the browser. The script uses the `.venv` folder (with a dot) that `setup.ps1` creates and stops with a clear message if it is missing. The equivalent direct command is `.\.venv\Scripts\python.exe -m src.dashboard --open`.
 
-What has been verified: the server and the engine behind it by 29 automated tests on the synthetic model (one run at a time, invalid inputs, cancellation, cache reset between runs, mode switching, cleanup when the page closes or the engine fails, localhost-only binding, refusing a busy port); the page's math splitting and KaTeX settings by Node.js checks (run by `python -m pytest` when Node.js is installed); and the real model through the same HTTP interface the page uses (`eval/dashboard_smoke.py`: two runs in a row, a live budget change, one comparison). The page itself has not been clicked through in a browser by an automated test; that check is manual.
+- **Run:** a prompt, real model or synthetic demo, cached or memory-mapped, streamed answer, and three live figures (first-token time, decode speed, private memory). During a real cached run a memory-budget slider changes the budget for that run. Settings (token limit, budget, starting cache) are in a collapsed panel; definitions and per-run details are in a Details panel.
+- **Compare:** the same prompt and settings in both modes, one after the other, with each run's progress, side-by-side results and whether the generated tokens match. One run of each is not a benchmark; the Details panel says why.
+- **Evidence:** the recorded benchmark figures, read from the committed result files and labelled as recorded, with links to the files, and the test command.
+
+Without the model store it still opens and offers the **synthetic demo** (a tiny random-weight model; its output is meaningless token ids and is labelled as such). For the real model, set `$env:LEANMOE_MODELS_ROOT` (see Path 2) in the same window before starting it. One run at a time. A run's first forward pass (prefill, about 6 to 10 s on the real model) can't be interrupted, so a cancel during it takes effect when it ends, and the page says so. Equations are typeset with KaTeX, bundled in the repository (MIT license), with untrusted commands disabled.
+
+Screenshots from the browser check: [run with a budget change](docs/screenshots/run-budget-change.png), [an equation answer](docs/screenshots/run-equation-answer.png), [comparison](docs/screenshots/compare.png), [evidence](docs/screenshots/evidence.png), [phone width](docs/screenshots/phone-synthetic.png).
+
+What has been verified: the server by 29 automated tests on the synthetic model (one run at a time, invalid inputs, cancellation, cache reset, mode switching, cleanup when the page closes or the engine fails, localhost-only binding, refusing a busy port); the page's math rendering by Node.js checks; and the page itself in Microsoft Edge driven by Playwright on the development laptop with the real model (all three tabs, settings, synthetic run, streaming, a typeset equation answer, a live budget change, cancel during prefill, comparison, phone width, no console errors). The browser script lives outside the repository and isn't part of `pytest`; it is a one-time check, not a regression test.
 
 ### Common errors
 
