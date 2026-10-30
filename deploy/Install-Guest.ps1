@@ -7,6 +7,7 @@ param(
     [string]$RepoRoot='C:\LeanMoE'
 )
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/Guest-Tools.ps1"
 & "$PSScriptRoot/Install-Prerequisites.ps1" -PythonExe $PythonExe
 if ((Get-FileHash -LiteralPath $CaddyExe -Algorithm SHA256).Hash -ne $CaddySha256) { throw 'Caddy checksum mismatch' }
 if ((Get-CimInstance Win32_OperatingSystem).Caption -notmatch 'Windows Server') { throw 'This script is for the approved VM, not the laptop.' }
@@ -27,10 +28,8 @@ icacls 'C:\LeanMoE-runtime' /grant '*S-1-5-19:(OI)(CI)M' | Out-Null
 icacls 'D:\LeanMoE-models' /grant '*S-1-5-19:(OI)(CI)M' | Out-Null
 & $PythonExe -m venv .venv
 if ($LASTEXITCODE) { throw 'venv failed' }
-& '.\.venv\Scripts\python.exe' -m pip install -r deploy/requirements-cloud.txt
-if ($LASTEXITCODE) { throw 'dependencies failed' }
-& '.\.venv\Scripts\python.exe' -m pytest -q
-if ($LASTEXITCODE) { throw 'tests failed' }
+Invoke-GuestTool (Join-Path $RepoRoot '.venv\Scripts\python.exe') @('-m','pip','install','--disable-pip-version-check','-r','deploy/requirements-cloud.txt') 'guest-install'
+Invoke-GuestTool (Join-Path $RepoRoot '.venv\Scripts\python.exe') @('-m','pytest','-q') 'guest-tests'
 $cfg = Get-Content -LiteralPath 'C:\LeanMoE-private\site.json' -Raw | ConvertFrom-Json
 & '.\.venv\Scripts\python.exe' deploy/store_manifest.py verify --store-root $cfg.durableStore --manifest $cfg.manifest
 if ($LASTEXITCODE) { throw 'store integrity failed' }
@@ -38,8 +37,7 @@ $env:LEANMOE_MODELS_ROOT = Split-Path -Parent $cfg.durableStore
 & '.\.venv\Scripts\python.exe' scripts/preflight.py --require-model
 if ($LASTEXITCODE) { throw 'preflight failed' }
 $env:LEANMOE_PROXY_SECRET=$cfg.proxySecret; $env:LEANMOE_PUBLIC_HOST=$cfg.publicHost; $env:LEANMOE_ACME_EMAIL=$cfg.acmeEmail
-& 'C:\LeanMoE-tools\caddy.exe' validate --config deploy/Caddyfile --adapter caddyfile
-if ($LASTEXITCODE) { throw 'proxy validation failed' }
+Invoke-GuestTool 'C:\LeanMoE-tools\caddy.exe' @('validate','--config','deploy/Caddyfile','--adapter','caddyfile') 'guest-caddy'
 $principal = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\LOCAL SERVICE' -LogonType ServiceAccount -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero)
 foreach ($role in @('backend','proxy')) {

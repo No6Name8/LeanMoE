@@ -11,7 +11,7 @@ $run = Start-Process -FilePath $installer -ArgumentList '/install','/quiet','/no
 if ($run.ExitCode -eq 3010) { throw 'Runtime installed; reboot required before continuing.' }
 if ($run.ExitCode -notin 0,1638) { throw "VC++ runtime installation failed: $($run.ExitCode)" }
 # pip verifies PyPI TLS with its normal trust configuration; never use trusted-host.
-& $PythonExe -m pip install --index-url https://pypi.org/simple certifi==2026.10.23
+& $PythonExe -m pip install --disable-pip-version-check --index-url https://pypi.org/simple certifi==2026.10.23
 if ($LASTEXITCODE) { throw 'Certificate bundle installation failed.' }
 $bundle = & $PythonExe -m certifi
 if ($LASTEXITCODE -or -not (Test-Path -LiteralPath $bundle)) { throw 'Certificate bundle missing.' }

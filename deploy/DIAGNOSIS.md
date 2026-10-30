@@ -80,3 +80,14 @@ could otherwise terminate service before the approved deadline. Supervisors stil
 obey the private shutdown timestamp, and the Azure shutdown and $150 alert budget
 are unchanged. The earlier $161 projection exceeds that alert threshold by $11;
 disk/IP costs continue after deallocation.
+
+The prepared pinned release passed 178 VM tests; three JavaScript checks were
+skipped because Node.js is absent on the VM. The full local working tree passed
+189 tests (including eight unfinished task-benchmark tests kept out of deployment).
+The published deployment suite therefore contains 181 tests. Real Edge checks at
+desktop/phone widths covered navigation, Cloud entry/local instructions, recorded
+figures and layout, with no page errors or horizontal overflow. Bicep compilation
+and PowerShell parsing also passed. A release-script fix handles native stdout
+and stderr in private files and checks exit codes: Caddy's successful stderr
+diagnostics otherwise became a terminating PowerShell 5.1 error under redirected
+output. Both zero-exit/stderr and nonzero-exit handling were checked locally.

@@ -23,16 +23,13 @@ if (-not (Test-Path (Join-Path $release 'src\dashboard\server.py'))) { throw 'Un
 Set-Content (Join-Path $release 'DEPLOYED_VERSION.txt') "source_commit: $Commit`narchive_sha256: $archiveHash" -Encoding ASCII
 icacls $release /grant '*S-1-5-19:(OI)(CI)RX' | Out-Null
 Set-Location -LiteralPath $release
-& $PythonExe -m pip install -r deploy/requirements-cloud.txt
-if ($LASTEXITCODE) { throw 'Dependencies failed; old deployment remains selected.' }
-& $PythonExe -m pytest -q
-if ($LASTEXITCODE) { throw 'Tests failed; old deployment remains selected.' }
+. (Join-Path $release 'deploy\Guest-Tools.ps1')
+Invoke-GuestTool $PythonExe @('-m','pip','install','--disable-pip-version-check','-r','deploy/requirements-cloud.txt') 'release-install'
+Invoke-GuestTool $PythonExe @('-m','pytest','-q') 'release-tests'
 $env:LEANMOE_MODELS_ROOT = Split-Path -Parent $cfg.fastStore
-& $PythonExe scripts/preflight.py --require-model
-if ($LASTEXITCODE) { throw 'Preflight failed; old deployment remains selected.' }
+Invoke-GuestTool $PythonExe @('scripts/preflight.py','--require-model') 'release-preflight'
 $env:LEANMOE_PROXY_SECRET=$cfg.proxySecret; $env:LEANMOE_PUBLIC_HOST=$cfg.publicHost; $env:LEANMOE_ACME_EMAIL=$cfg.acmeEmail
-& C:\LeanMoE-tools\caddy.exe validate --config deploy/Caddyfile --adapter caddyfile
-if ($LASTEXITCODE) { throw 'Proxy validation failed.' }
+Invoke-GuestTool 'C:\LeanMoE-tools\caddy.exe' @('validate','--config','deploy/Caddyfile','--adapter','caddyfile') 'release-caddy'
 # Recheck immediately before switching. Requests during this brief maintenance
 # window can fail; the authenticated proxy never serves an unprotected backend.
 if ((Invoke-RestMethod http://127.0.0.1:8770/api/status -Headers $headers).busy) { throw 'Engine became busy; retry later.' }
