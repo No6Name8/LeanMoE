@@ -13,15 +13,25 @@ RESULTS = Path(__file__).resolve().parents[1] / "results"
 def test_committed_results_and_details():
     cards = recorded_evidence(RESULTS)
     assert len(cards) == 4 and [c["additional"] for c in cards] == [False, False, True, True]
+    assert cards[0]["figure"] == "80/80"
+    assert cards[1]["figure"] == "2.07\u00d7"
+    assert cards[0]["meaning"] == "Matching output tokens in the recorded cut/uncut pair"
+    assert cards[1]["meaning"] == "Ratio of mean decode throughput versus Windows paging"
+    assert "5 of 6" in cards[1]["context"]
+    required = {"Model", "Hardware", "Prompts", "Repetitions", "Token limit", "Threads", "Budget", "Timing definitions"}
+    assert all(required <= dict(c["settings"]).keys() for c in cards)
+    assert dict(cards[0]["settings"])["Token limit"] == "80"
+    assert dict(cards[1]["settings"])["Token limit"] == "48"
     assert "80 tokens match" in cards[0]["value"] and "2.390 GB" in cards[0]["value"]
     assert "2.07x" in cards[1]["value"] and "5/6 pairs" in cards[1]["value"]
     assert "1.07x" in cards[2]["value"] and "6/6 pairs" in cards[2]["value"]
     assert "7.8 vs 23.9 s" in cards[3]["value"]
-    assert all(c["methodology"] and c["limitations"] and c["commands"] and c["files"] for c in cards)
+    assert all(c["settings"] and c["limitations"] and c["commands"] and c["files"] for c in cards)
 
 
 def test_missing_and_invalid_files_are_explicit(tmp_path):
     assert all("unavailable" in c["value"] for c in recorded_evidence(tmp_path))
+    assert all(c["figure"] == "unavailable" for c in recorded_evidence(tmp_path))
     (tmp_path / MMAP_FULL).write_text("{broken")
     assert "unavailable" in recorded_evidence(tmp_path)[1]["value"]
 
@@ -39,13 +49,16 @@ def test_mmap_recomputed_and_failures_not_filtered(tmp_path, mutation):
     else:
         data["runs"][0]["error"] = "failed"
     (tmp_path / MMAP_FULL).write_text(json.dumps(data))
-    result = recorded_evidence(tmp_path)[1]["value"]
+    card = recorded_evidence(tmp_path)[1]
+    result = card["value"]
     if mutation == "rates":
+        assert card["figure"] == "2.00\u00d7"
         assert "2.00x" in result and "6/6 pairs" in result
     elif mutation == "tokens":
         assert "every pair: no" in result
     else:
         assert "unavailable" in result
+        assert card["figure"] == "unavailable"
 
 
 def test_budget_uses_strict_checker(tmp_path):
@@ -55,6 +68,7 @@ def test_budget_uses_strict_checker(tmp_path):
     data["adaptive"]["generated_ids"].pop()
     (tmp_path / PRIMARY_CUT).write_text(json.dumps(data))
     assert "unavailable" in recorded_evidence(tmp_path)[0]["value"]
+    assert recorded_evidence(tmp_path)[0]["figure"] == "unavailable"
 
 
 def test_historical_blas_reproduction_can_select_twelve_threads():

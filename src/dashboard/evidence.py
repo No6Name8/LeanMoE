@@ -27,10 +27,37 @@ def _load(results: Path, name: str) -> dict | None:
         return None
 
 
-def _card(label, files, *, additional=False, methodology="", limitations="", commands=()):
+def _card(label, files, *, additional=False, limitations="", commands=()):
     return {"label": label, "files": files, "additional": additional,
             "value": "unavailable - source artifacts missing or invalid",
-            "methodology": methodology, "limitations": limitations, "commands": list(commands)}
+            "limitations": limitations, "commands": list(commands),
+            "figure": "unavailable", "meaning": "", "settings": []}
+
+
+def _settings(*, prompts="unavailable", repetitions="unavailable", tokens="unavailable",
+              threads="unavailable", budget="unavailable", design="unavailable"):
+    return [
+        ["Model", "Qwen1.5-MoE-A2.7B-Chat int8; numpy, fused kernel, greedy decoding"],
+        ["Hardware", "Historical: Intel Core i5-12450H, 8.30 GB RAM, NVMe SSD, Windows (EVIDENCE.md)"],
+        ["Prompts", prompts], ["Repetitions", repetitions], ["Token limit", str(tokens)],
+        ["Threads", threads], ["Budget", budget], ["Run design", design],
+        ["Timing definitions", "First token: prefill forward pass; excludes model loading and tokenization. "
+                               "Decode: (output tokens - 1) / remaining forward-pass seconds."],
+    ]
+
+
+def _experiment_settings(data, runs, *, prefetch=False):
+    design = data["design"]
+    prompts = list(dict.fromkeys(r["prompt_id"] for r in runs))
+    threads = ("12 OpenBLAS (historical, documented in EVIDENCE.md; not recorded per run)" if prefetch else
+               " / ".join(str(n) for n in sorted({r["openblas_threads"] for r in runs})) + " OpenBLAS; " +
+               " / ".join(str(n) for n in sorted({r["numba_threads"] for r in runs})) + " numba")
+    return _settings(prompts=f"{len(prompts)}: " + ", ".join(prompts) + " (texts in source artifacts)",
+                     repetitions=f"{design['rounds']} per configuration per prompt", tokens=design["tokens"],
+                     threads=threads,
+                     budget=(f"Fixed expert cache: {design['cache_gb']:g} GB" if prefetch else
+                             f"Cached process budget: {design['budget_gb']:g} GB"),
+                     design="Fresh processes, alternating order; system file cache not cleared")
 
 
 PY = r".\.venv\Scripts\python.exe"
@@ -68,42 +95,49 @@ def recorded_evidence(results: Path) -> list[dict]:
     from eval.compare_artifacts import check_pair
 
     budget = _card("A smaller budget, the same output", [PRIMARY_UNCUT, PRIMARY_CUT],
-        methodology="One prompt, greedy decoding, cached + adaptive prefetch, 4 OpenBLAS threads. "
-                    "Only the budget-cut schedule differs. Private memory is the per-token sample at the cut. "
-                    "The strict saved-artifact checker validates completion, matching settings and tokens, and cache shrink.",
         limitations="One prompt and configuration family. The budget is a planning target, not a hard ceiling. "
                     "Memory sampled every 50 ms can miss spikes. Starting cache sizes differ with available RAM. "
                     "The oversized fixed-cache run is a startup refusal, not an out-of-memory crash or speed baseline.",
         commands=[PY + " eval/compare_artifacts.py results/" + PRIMARY_UNCUT + " results/" + PRIMARY_CUT,
                   "$env:OPENBLAS_NUM_THREADS = '4'", PY + " -m eval.adaptive_demo --cut-at 0", PY + " -m eval.adaptive_demo --cut-at 20"])
     mmap = _card("LeanMoE versus Windows paging", [MMAP_FULL],
-        methodology="Three fixed prompts, two runs per mode per prompt, 48 new tokens, 4 OpenBLAS threads; "
-                    "same int8 store and fused kernel. Fresh processes in alternating order; cached mode has a 3.0 GB budget. "
-                    "Speedup is the ratio of arithmetic mean decode rates, not the mean of pair ratios. "
-                    "First-token figures are medians; source timings exclude model loading.",
         limitations="One laptop, six matched pairs. Windows file cache was never cleared, so fresh processes are not cold-cache runs. "
                     "Background load and run order matter; one warm paging run was faster. "
                     "This compares the whole cached configuration and does not isolate prefetch.",
         commands=[PY + " -m eval.config_compare --stage mmap --prompts fact code explain --rounds 2 --tokens 48 --budget-gb 3.0 --blas 4"])
     prefetch = _card("Prefetch on versus off", [PREFETCH_11], additional=True,
-        methodology="Three prompts, two runs each, 48 tokens, alternating fresh processes, fixed 1.1 GB cache (126 experts), 12 OpenBLAS threads.",
         limitations="Older thread configuration; not remeasured with the current 4-thread default. "
                     "The smaller 0.6 GB exploratory cache was noisy. ExpertRelay previously found a different ordering on its base store.",
         commands=["$env:OPENBLAS_NUM_THREADS = '12'", PY + " -m eval.prefetch_ablation --cache-gb 1.1 --tokens 48 --rounds 2"])
     blas_files = ["config_compare_blas_explain_20261030-053657.json", "config_compare_blas_confirm_20261030-054506.json"]
     blas = _card("Four versus twelve OpenBLAS threads", blas_files, additional=True,
-        methodology="Three prompts, two runs per configuration, 48 tokens, 3.0 GB budget. First-token medians are computed across the six runs of each configuration.",
         limitations="Changes threads and cache capacity together. Decode effects vary by prompt; no isolated threading speedup established. First-token outliers remain included. The explicit baseline thread option is needed because the engine now defaults to 4 threads.",
         commands=[PY + " -m eval.config_compare --stage blas --baseline-blas 12 --prompts fact code explain --rounds 2 --tokens 48 --budget-gb 3.0"])
+    budget["meaning"] = "Matching output tokens in the recorded cut/uncut pair"
+    mmap["meaning"] = "Ratio of mean decode throughput versus Windows paging"
+    for card in (budget, mmap, prefetch, blas):
+        card["settings"] = _settings()
     try:
         if check_pair(results / PRIMARY_UNCUT, results / PRIMARY_CUT)[0]:
             c = _load(results, PRIMARY_CUT)["adaptive"]
             ev = next(e for e in c["budget_events"] if e["token"] == c["cut_schedule"]["cut_at"])
             row = c["per_token"][ev["token"] - 1]
+            u = _load(results, PRIMARY_UNCUT)["adaptive"]
+            matched = sum(a == b for a, b in zip(u["generated_ids"], c["generated_ids"]))
+            budget["figure"] = f"{matched}/{len(c['generated_ids'])}"
+            settings = c["settings"]
+            budget["settings"] = _settings(prompts="1: " + settings["prompt"],
+                repetitions="1 uncut + 1 cut run", tokens=settings["max_new_tokens"],
+                threads=f"{settings['openblas_threads']} OpenBLAS; numba count not recorded",
+                budget=f"{settings['start_budget_gb']:g} to {ev['budget_gb']:g} GB after token {ev['token']}; starting cache {settings['start_cache_gb']:g} GB",
+                design="Same settings except cut schedule; cache + adaptive prefetch. Strict saved-pair checker passes.")
             budget["value"] = (f"{c['settings']['start_budget_gb']:g} to {ev['budget_gb']:g} GB; "
                                f"{ev['slots_before']} to {ev['slots_after']} cached experts. "
                                f"All {len(c['generated_ids'])} tokens match. "
                                f"Private memory at the cut: {row['process_private_mb'] / 1000:.3f} GB.")
+            budget["context"] = (f"{settings['start_budget_gb']:g} to {ev['budget_gb']:g} GB; cache "
+                                 f"{ev['slots_before']} to {ev['slots_after']} experts; "
+                                 f"{row['process_private_mb'] / 1000:.3f} GB private memory at the cut.")
     except (KeyError, TypeError, ValueError, IndexError, StopIteration):
         pass
     for card, name, left, right, field in [(mmap, MMAP_FULL, "cached", "mmap", "mode"),
@@ -112,23 +146,31 @@ def recorded_evidence(results: Path) -> list[dict]:
             data = _load(results, name)
             pairs = _matched(data["runs"], left, right, field)
             a, b, wins, same = _speed(pairs)
+            card["settings"] = _experiment_settings(data, data["runs"], prefetch=name == PREFETCH_11)
             card["value"] = (f"{a / b:.2f}x ratio of mean decode rates ({a:.3f} vs {b:.3f} tokens/s). "
                              f"Faster in {wins}/{len(pairs)} pairs. Tokens match in every pair: {'yes' if same else 'no'}.")
             if name == MMAP_FULL:
+                card["figure"] = f"{a / b:.2f}\u00d7"
+                card["context"] = (f"Faster in {wins} of {len(pairs)} matched comparisons. "
+                                     f"Mean decode: {a:.3f} vs {b:.3f} tokens/s. "
+                                     f"Tokens match in every pair: {'yes' if same else 'no'}.")
+                card["settings"].append(["Throughput ratio", "Ratio of arithmetic means, not the mean of pair ratios"])
                 ta = statistics.median(x["time_to_first_token_s"] for x, _ in pairs)
                 tb = statistics.median(y["time_to_first_token_s"] for _, y in pairs)
-                card["methodology"] += f" Recorded first-token medians: {ta:.1f} vs {tb:.1f} s."
+                card["settings"].append(["Recorded first-token medians", f"LeanMoE {ta:.1f} s; Windows paging {tb:.1f} s"])
                 for key, label in [("sampled_peak_private_gb", "Sampled peak private commit"),
                                    ("sampled_peak_working_set_gb", "sampled peak working set")]:
                     a_values = [x[key] for x, _ in pairs]
                     b_values = [y[key] for _, y in pairs]
-                    card["methodology"] += (f" {label}: LeanMoE {min(a_values):.2f}-{max(a_values):.2f} GB; "
-                                            f"Windows paging {min(b_values):.2f}-{max(b_values):.2f} GB.")
+                    card["settings"].append([label, f"LeanMoE {min(a_values):.2f}-{max(a_values):.2f} GB; "
+                                            f"Windows paging {min(b_values):.2f}-{max(b_values):.2f} GB"])
         except (KeyError, TypeError, ValueError, AttributeError, ZeroDivisionError, statistics.StatisticsError):
             pass
     try:
         runs = [r for name in blas_files for r in _load(results, name)["runs"]]
         pairs = _matched(runs, 4, "default", "blas_setting")
+        blas["settings"] = _experiment_settings(_load(results, blas_files[0]), runs)
+        blas["settings"].append(["First-token summary", "Median across all six runs per configuration; thread and cache sizes change together"])
         a = statistics.median(x["time_to_first_token_s"] for x, _ in pairs)
         b = statistics.median(y["time_to_first_token_s"] for _, y in pairs)
         wins = sum(x["time_to_first_token_s"] < y["time_to_first_token_s"] for x, y in pairs)

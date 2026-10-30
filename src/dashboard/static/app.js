@@ -185,7 +185,7 @@
     } finally { clearTimeout(timeout); statusPending = false; }
     ui.status = s;
     const ok = s.real_store.available;
-    $("store-pill").textContent = ok ? "Qwen ready" : "Qwen not installed";
+    $("store-pill").textContent = ok ? "Qwen ready" : "Qwen store not found";
     $("store-pill").className = "pill " + (ok ? "ok" : "no");
     ui.qwenMissing = !ok;
     for (const p of ["run", "cmp"]) $(p + "-missing-detail").textContent = ok ? "" : s.real_store.problem;
@@ -207,12 +207,23 @@
     $("additional-recorded").textContent = "";
     for (const it of items || []) {
       const card = el("article", null, "card experiment");
-      card.append(el("h3", it.label), el("p", it.value, "result"));
+      const head = el("div", null, "answer-head");
+      head.append(el("h3", it.label), el("span", "Recorded", "badge recorded"));
+      card.appendChild(head);
+      if (it.meaning) card.append(el("div", it.figure, "evidence-figure"), el("p", it.meaning, "figure-meaning"));
+      card.appendChild(el("p", it.context || it.value, "result"));
       const details = el("details", null, "details compact");
       details.appendChild(el("summary", "Methodology, limits & reproduce"));
-      for (const [title, text] of [["Methodology", it.methodology], ["Limitations", it.limitations]]) {
-        details.append(el("h4", title), el("p", text, "hint"));
+      details.appendChild(el("h4", "Settings"));
+      const table = el("table", null, "settings-table");
+      table.setAttribute("aria-label", it.label + " settings");
+      const body = el("tbody");
+      for (const [label, value] of it.settings || []) {
+        const row = el("tr"); const th = el("th", label); th.scope = "row";
+        row.append(th, el("td", value)); body.appendChild(row);
       }
+      table.appendChild(body); details.appendChild(table);
+      details.append(el("h4", "Limitations"), el("p", it.limitations, "hint"));
       details.appendChild(el("h4", "Source artifacts"));
       const files = el("div", null, "files");
       for (const f of it.files) {

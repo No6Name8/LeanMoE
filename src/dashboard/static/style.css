@@ -191,3 +191,10 @@ a { color: var(--accent); }
 #system-popover .kv { position: static; width: auto; max-height: none; padding: 0; border: 0; box-shadow: none; }
 #system-popover > .hint { margin: 0 0 10px; }
 #system-popover .system-warning { color: var(--warn); font-weight: 600; }
+
+.evidence-figure { font-size: 2.4rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.experiment .figure-meaning { margin: 4px 0 10px; color: var(--muted); }
+.settings-table { width: 100%; border-collapse: collapse; font-size: .85rem; table-layout: fixed; }
+.settings-table th, .settings-table td { padding: 7px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.settings-table th { width: 26%; font-weight: 600; color: var(--muted); }
+@media (max-width: 720px) { .settings-table th { width: 31%; } }
