@@ -38,7 +38,22 @@ import numpy as np
 from src.engine.runtime.qwen_moe import KVCache, QwenMoe
 from src.engine.runtime.text_stream import IncrementalDecoder
 
-__all__ = ["CancelToken", "ContextTooLong", "IncrementalDecoder", "StreamEvent", "check_context", "stream_generate"]
+__all__ = [
+    "EOS_TOKEN_NAMES", "CancelToken", "ContextTooLong", "IncrementalDecoder", "StreamEvent",
+    "check_context", "eos_ids_for", "stream_generate",
+]  # fmt: skip
+
+# The Chat model's end-of-turn tokens, as listed in its generation_config.json
+# (eos_token_id [151645, 151643]). That file isn't stored with the model, so the
+# ids are resolved from these names through the store's tokenizer: the one place
+# every caller (dashboard, command-line example, audit) gets them from.
+EOS_TOKEN_NAMES = ("<|im_end|>", "<|endoftext|>")
+
+
+def eos_ids_for(tokenizer) -> frozenset[int]:
+    """End-of-sequence token ids for a tokenizer (empty if it has none of the names)."""
+    ids = {tokenizer.token_to_id(name) for name in EOS_TOKEN_NAMES}
+    return frozenset(i for i in ids if i is not None)
 
 
 class ContextTooLong(ValueError):
@@ -69,6 +84,7 @@ class StreamEvent:
     token_id: int | None = None
     text_delta: str = ""
     step_seconds: float = 0.0  # this forward pass
+    step_stats: dict = field(default_factory=dict)  # expert loads, reads, hits of this forward pass
     # filled on the "done" event
     stop_reason: str | None = None  # "eos", "limit", "cancelled", "error"
     token_ids: list[int] = field(default_factory=list)
@@ -80,6 +96,9 @@ class StreamEvent:
     cancel_delay_s: float | None = None  # from cancel request to stop
     cancel_phase: str | None = None  # "before start", "prefill" or "decode"
     error: str | None = None
+
+
+STEP_STATS = ("expert_loads", "demand_reads", "cache_hits", "prefetch_hits", "prefetch_waits", "expert_read_seconds")
 
 
 def check_context(prompt_len: int, max_new_tokens: int, max_seq: int) -> None:
@@ -132,7 +151,7 @@ def stream_generate(
             for i in range(max_new_tokens):
                 phase = "prefill" if i == 0 else "decode"
                 t = time.perf_counter()
-                logits, _ = model.forward(np.asarray(feed), cache)
+                logits, timings = model.forward(np.asarray(feed), cache)
                 nxt = int(np.argmax(logits))
                 step_times.append(time.perf_counter() - t)
                 if nxt in eos_ids:
@@ -140,7 +159,9 @@ def stream_generate(
                     break
                 out.append(nxt)
                 delta = decoder.push(nxt) if decoder is not None else ""
-                yield StreamEvent("token", index=i, token_id=nxt, text_delta=delta, step_seconds=step_times[-1])
+                stats = {k: getattr(timings, k, 0) for k in STEP_STATS}
+                yield StreamEvent("token", index=i, token_id=nxt, text_delta=delta, step_seconds=step_times[-1],
+                                  step_stats=stats)  # fmt: skip
                 if between_tokens is not None:
                     between_tokens()
                 if cancel is not None and cancel.cancelled:

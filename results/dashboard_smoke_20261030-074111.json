@@ -1,0 +1,448 @@
+{
+ "prompt": "What is 487 × 36?",
+ "started": "2026-10-30T07:39:36",
+ "status": {
+  "real_store_available": true,
+  "threads": {
+   "openblas": 4,
+   "numba": 12
+  },
+  "memory": {
+   "private_gb": 0.208351232,
+   "working_set_gb": 0.137822208,
+   "system_available_gb": 1.428713472,
+   "system_total_gb": 8.300781568
+  },
+  "limits": {
+   "max_seq": 512,
+   "max_new_tokens": 400,
+   "max_prompt_chars": 4000,
+   "default_budget_gb": 3.5,
+   "default_start_cache_gb": 1.2
+  }
+ },
+ "run1": {
+  "http_status": 200,
+  "start": [
+   {
+    "type": "start",
+    "request_id": "8318630bef544e5e8cc62c4519ad4401",
+    "run": null,
+    "source": "real",
+    "mode": "cached",
+    "model_reused": false,
+    "load_seconds": 3.3236142001114786,
+    "cache": {
+     "slots": 138,
+     "gb": 1.196630016,
+     "cached_experts": 0
+    },
+    "prompt_tokens": 30,
+    "max_new_tokens": 24,
+    "max_seq": 512,
+    "budget_gb": 3.5,
+    "live_budget": true,
+    "memory": {
+     "private_gb": 2.96644608,
+     "working_set_gb": 1.689575424
+    }
+   }
+  ],
+  "done": [
+   {
+    "type": "done",
+    "run": null,
+    "source": "real",
+    "mode": "cached",
+    "stop_reason": "eos",
+    "error": null,
+    "prompt_tokens": 30,
+    "output_tokens": 20,
+    "token_ids": [
+     785,
+     1985,
+     315,
+     220,
+     19,
+     23,
+     22,
+     323,
+     220,
+     18,
+     21,
+     374,
+     220,
+     16,
+     22,
+     11,
+     15,
+     20,
+     17,
+     13
+    ],
+    "text": "The product of 487 and 36 is 17,052.",
+    "tail": "",
+    "time_to_first_token_s": 8.586208899971098,
+    "decode_tokens_per_s": 2.0617468013921516,
+    "total_seconds": 18.341243000002578,
+    "load_seconds": 3.3236142001114786,
+    "model_reused": false,
+    "cancel_delay_s": null,
+    "cancel_phase": null,
+    "totals": {
+     "expert_loads": 2995,
+     "demand_reads": 958,
+     "cache_hits": 337,
+     "prefetch_hits": 1050
+    },
+    "cache_at_start": {
+     "slots": 138,
+     "gb": 1.196630016,
+     "cached_experts": 0
+    },
+    "cache_at_end": {
+     "slots": 138,
+     "gb": 1.196630016,
+     "cached_experts": 138
+    },
+    "memory": {
+     "peak_private_gb": 3.235069952,
+     "peak_working_set_gb": 2.809606144,
+     "samples": 171,
+     "interval_s": 0.1
+    }
+   }
+  ],
+  "budget_events": [],
+  "event_count": 24
+ },
+ "run2": {
+  "http_status": 200,
+  "start": [
+   {
+    "type": "start",
+    "request_id": "345fa01315ad481dbaad4232e623f5de",
+    "run": null,
+    "source": "real",
+    "mode": "cached",
+    "model_reused": true,
+    "load_seconds": 0.0,
+    "cache": {
+     "slots": 138,
+     "gb": 1.196630016,
+     "cached_experts": 138
+    },
+    "prompt_tokens": 30,
+    "max_new_tokens": 24,
+    "max_seq": 512,
+    "budget_gb": 3.5,
+    "live_budget": true,
+    "memory": {
+     "private_gb": 3.028140032,
+     "working_set_gb": 2.801434624
+    }
+   }
+  ],
+  "done": [
+   {
+    "type": "done",
+    "run": null,
+    "source": "real",
+    "mode": "cached",
+    "stop_reason": "eos",
+    "error": null,
+    "prompt_tokens": 30,
+    "output_tokens": 20,
+    "token_ids": [
+     785,
+     1985,
+     315,
+     220,
+     19,
+     23,
+     22,
+     323,
+     220,
+     18,
+     21,
+     374,
+     220,
+     16,
+     22,
+     11,
+     15,
+     20,
+     17,
+     13
+    ],
+    "text": "The product of 487 and 36 is 17,052.",
+    "tail": "",
+    "time_to_first_token_s": 5.098706400021911,
+    "decode_tokens_per_s": 1.7892287623045748,
+    "total_seconds": 16.372837799834087,
+    "load_seconds": 0.0,
+    "model_reused": true,
+    "cancel_delay_s": null,
+    "cancel_phase": null,
+    "totals": {
+     "expert_loads": 2995,
+     "demand_reads": 1431,
+     "cache_hits": 4,
+     "prefetch_hits": 903
+    },
+    "cache_at_start": {
+     "slots": 138,
+     "gb": 1.196630016,
+     "cached_experts": 138
+    },
+    "cache_at_end": {
+     "slots": 34,
+     "gb": 0.294821888,
+     "cached_experts": 34
+    },
+    "memory": {
+     "peak_private_gb": 3.232210944,
+     "peak_working_set_gb": 2.815881216,
+     "samples": 153,
+     "interval_s": 0.1
+    }
+   }
+  ],
+  "budget_events": [
+   {
+    "type": "budget",
+    "run": null,
+    "event": {
+     "token": 2,
+     "budget_gb": 2.5,
+     "slots_before": 138,
+     "slots_after": 34,
+     "reason": "limited by the memory budget"
+    },
+    "cache": {
+     "slots": 34,
+     "gb": 0.294821888,
+     "cached_experts": 34
+    }
+   }
+  ],
+  "event_count": 25,
+  "budget_reply": {
+   "status": 200,
+   "accepted": true,
+   "budget_gb": 2.5,
+   "message": "Applied after the current token."
+  }
+ },
+ "compare": {
+  "http_status": 200,
+  "start": [
+   {
+    "type": "start",
+    "request_id": "65387f226cae4fcc98922ca7379584f4",
+    "run": "cached",
+    "source": "real",
+    "mode": "cached",
+    "model_reused": false,
+    "load_seconds": 3.722532199928537,
+    "cache": {
+     "slots": 138,
+     "gb": 1.196630016,
+     "cached_experts": 0
+    },
+    "prompt_tokens": 30,
+    "max_new_tokens": 16,
+    "max_seq": 512,
+    "budget_gb": 3.5,
+    "live_budget": true,
+    "memory": {
+     "private_gb": 3.031752704,
+     "working_set_gb": 1.656918016
+    }
+   },
+   {
+    "type": "start",
+    "request_id": "65387f226cae4fcc98922ca7379584f4",
+    "run": "mmap",
+    "source": "real",
+    "mode": "mmap",
+    "model_reused": false,
+    "load_seconds": 1.970103200059384,
+    "cache": null,
+    "prompt_tokens": 30,
+    "max_new_tokens": 16,
+    "max_seq": 512,
+    "budget_gb": 3.5,
+    "live_budget": false,
+    "memory": {
+     "private_gb": 0.290709504,
+     "working_set_gb": 0.09054208
+    }
+   }
+  ],
+  "done": [
+   {
+    "type": "done",
+    "run": "cached",
+    "source": "real",
+    "mode": "cached",
+    "stop_reason": "limit",
+    "error": null,
+    "prompt_tokens": 30,
+    "output_tokens": 16,
+    "token_ids": [
+     785,
+     1985,
+     315,
+     220,
+     19,
+     23,
+     22,
+     323,
+     220,
+     18,
+     21,
+     374,
+     220,
+     16,
+     22,
+     11
+    ],
+    "text": "The product of 487 and 36 is 17,",
+    "tail": "",
+    "time_to_first_token_s": 5.87630459992215,
+    "decode_tokens_per_s": 2.0680627294159057,
+    "total_seconds": 13.139652000041679,
+    "load_seconds": 3.722532199928537,
+    "model_reused": false,
+    "cancel_delay_s": null,
+    "cancel_phase": null,
+    "totals": {
+     "expert_loads": 2611,
+     "demand_reads": 783,
+     "cache_hits": 230,
+     "prefetch_hits": 990
+    },
+    "cache_at_start": {
+     "slots": 138,
+     "gb": 1.196630016,
+     "cached_experts": 0
+    },
+    "cache_at_end": {
+     "slots": 138,
+     "gb": 1.196630016,
+     "cached_experts": 138
+    },
+    "memory": {
+     "peak_private_gb": 3.235713024,
+     "peak_working_set_gb": 2.857971712,
+     "samples": 124,
+     "interval_s": 0.1
+    }
+   },
+   {
+    "type": "done",
+    "run": "mmap",
+    "source": "real",
+    "mode": "mmap",
+    "stop_reason": "limit",
+    "error": null,
+    "prompt_tokens": 30,
+    "output_tokens": 16,
+    "token_ids": [
+     785,
+     1985,
+     315,
+     220,
+     19,
+     23,
+     22,
+     323,
+     220,
+     18,
+     21,
+     374,
+     220,
+     16,
+     22,
+     11
+    ],
+    "text": "The product of 487 and 36 is 17,",
+    "tail": "",
+    "time_to_first_token_s": 19.091824400005862,
+    "decode_tokens_per_s": 0.8865868261161676,
+    "total_seconds": 36.058816800126806,
+    "load_seconds": 1.970103200059384,
+    "model_reused": false,
+    "cancel_delay_s": null,
+    "cancel_phase": null,
+    "totals": {
+     "expert_loads": 2611,
+     "demand_reads": 0,
+     "cache_hits": 0,
+     "prefetch_hits": 0
+    },
+    "cache_at_start": null,
+    "cache_at_end": null,
+    "memory": {
+     "peak_private_gb": 0.496205824,
+     "peak_working_set_gb": 4.960432128,
+     "samples": 339,
+     "interval_s": 0.1
+    }
+   }
+  ],
+  "budget_events": [],
+  "event_count": 40,
+  "compare_done": [
+   {
+    "type": "compare_done",
+    "completed_runs": [
+     "cached",
+     "mmap"
+    ],
+    "token_ids_identical": true,
+    "runs": [
+     {
+      "mode": "cached",
+      "stop_reason": "limit",
+      "output_tokens": 16,
+      "time_to_first_token_s": 5.87630459992215,
+      "decode_tokens_per_s": 2.0680627294159057,
+      "load_seconds": 3.722532199928537,
+      "memory": {
+       "peak_private_gb": 3.235713024,
+       "peak_working_set_gb": 2.857971712,
+       "samples": 124,
+       "interval_s": 0.1
+      }
+     },
+     {
+      "mode": "mmap",
+      "stop_reason": "limit",
+      "output_tokens": 16,
+      "time_to_first_token_s": 19.091824400005862,
+      "decode_tokens_per_s": 0.8865868261161676,
+      "load_seconds": 1.970103200059384,
+      "memory": {
+       "peak_private_gb": 0.496205824,
+       "peak_working_set_gb": 4.960432128,
+       "samples": 339,
+       "interval_s": 0.1
+      }
+     }
+    ]
+   }
+  ]
+ },
+ "final_status": {
+  "busy": false,
+  "loaded": null,
+  "memory": {
+   "private_gb": 0.258842624,
+   "working_set_gb": 0.063909888,
+   "system_available_gb": 5.014122496,
+   "system_total_gb": 8.300781568
+  }
+ }
+}

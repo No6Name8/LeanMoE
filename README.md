@@ -8,7 +8,7 @@ This submission evaluates that design on the real model, including an **adaptive
 
 **Supported:** Windows 10 or 11, 64-bit, with Python 3.13 (tested on Windows 11 with Python 3.13.14; Python 3.10 to 3.12 may work but are untested). Linux and macOS are not supported: the engine reads expert weights with Windows-only unbuffered file I/O, so on those systems the engine tests are skipped (skipped is not passed) and only the saved-evidence checker runs. You also need Git and an internet connection for the package install.
 
-There is **no web dashboard yet**; everything runs from the command line. The quick-verification commands below were run word for word in a fresh clone of commit e8a27a8 in a new PowerShell session on the development laptop (Windows 11, Python 3.13.14), not yet on another machine. Later commits added tests (125 now); those were run in the development environment, not in a fresh clone.
+A local evaluation dashboard is included (see 'Local dashboard' below); everything else runs from the command line. The quick-verification commands below were run word for word in a fresh clone of commit e8a27a8 in a new PowerShell session on the development laptop (Windows 11, Python 3.13.14), not yet on another machine. Later commits added tests (156 now); those were run in the development environment, not in a fresh clone.
 
 ### Path 1: quick verification (no model download)
 
@@ -25,7 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1
 What each step does and what success looks like:
 
 - **`setup.ps1`** creates `.venv` inside the repository, installs the packages in `requirements-dev.txt` (numpy, numba, psutil, tokenizers, jinja2, pytest) and runs the preflight check. It ends with `Setup complete.` It is safe to rerun, downloads no model files and changes no system settings (`-ExecutionPolicy Bypass` applies to that one PowerShell process only). Measured on a fresh clone on the development laptop (packages downloaded fresh, no pip cache): 114 s; a rerun takes a few seconds.
-- **`pytest`** runs 125 tests and should end with `125 passed`. 63 are ExpertRelay's engine tests: each builds a tiny random-weight model and expert store in a temporary folder and runs the real engine on it, covering cache resizing, the live memory budget shrinking and growing mid-generation, and bit-identical output across expert sources, cache sizes and prefetch settings. 15 test LeanMoE's streaming generation on the same kind of store (same tokens as the batch path, end-of-sequence stop, length checks before allocation, cancellation, cleanup after errors, consecutive requests). The other 47 test the evidence checker, the memory-accounting baseline and streaming text decoding. These show the engine's mechanisms behave as specified on a synthetic model; they say nothing about the real model's quality or speed. Any `failed` or `skipped` count means that part was not verified. Measured time: 22 s.
+- **`pytest`** runs 156 tests and should end with `156 passed`. 63 are ExpertRelay's engine tests: each builds a tiny random-weight model and expert store in a temporary folder and runs the real engine on it, covering cache resizing, the live memory budget shrinking and growing mid-generation, and bit-identical output across expert sources, cache sizes and prefetch settings. 15 test LeanMoE's streaming generation on the same kind of store (same tokens as the batch path, end-of-sequence stop, length checks before allocation, cancellation, cleanup after errors, consecutive requests), and 29 test the local dashboard's server on it. The other 49 test the evidence checker, the memory-accounting baseline, streaming text decoding and (with Node.js installed) the dashboard page's math rendering; without Node.js those 2 are skipped, which means not verified. These show the engine's mechanisms behave as specified on a synthetic model; they say nothing about the real model's quality or speed. Any `failed` or `skipped` count means that part was not verified. Measured time: 27 s.
 - **`compare_artifacts.py`** reads two committed result files from real-model runs and should print `PASS: identical generated token ids (80 tokens) ...`. It checks the **recorded** evidence; it does not rerun the real model.
 
 **Streaming example (optional, no download).** `.\.venv\Scripts\python.exe -m eval.stream_demo --cancel-after-tokens 5` streams token ids from the tiny synthetic model and cancels after five; the output ids are meaningless, it shows the mechanics. With the real store, add `--real --prompt "..."` to stream text (see `--help`).
@@ -62,6 +62,18 @@ $env:LEANMOE_MODELS_ROOT = "D:\leanmoe-models"
 
 Each run writes a new `results\adaptive_demo_<timestamp>.json`. **To stop a run**, press Ctrl+C; it stops at the next point Python can interrupt, which during the prompt's first pass can take several seconds, and that run's result file is not written. The experiments behind the results below are `eval\prefetch_ablation.py` and `eval\config_compare.py` (about 15 to 20 minutes each; see their `--help`).
 
+### Local dashboard (optional)
+
+A single page on this computer for running workloads and inspecting the engine: prompt, cached or memory-mapped mode, streamed output, live timing, token counts, process memory and expert-cache counters, cancel, a live budget change (real model, cached mode), and a one-after-the-other comparison of both modes with the same prompt and settings. It also lists the recorded benchmark figures, read from the committed result files and labelled as recorded. It is not a chatbot, and model output is labelled unverified. After running the setup script:
+
+```
+.\.venv\Scripts\python.exe -m src.dashboard --open
+```
+
+It opens http://127.0.0.1:8770 and listens on this computer only (127.0.0.1; there is no option to expose it). Stop it with Ctrl+C in the PowerShell window. Without the model store it still opens: it shows the recorded evidence and offers a **synthetic engine demonstration** (the tiny random-weight model; its output is meaningless token ids and is labelled as such). For the real model, set `$env:LEANMOE_MODELS_ROOT` (see Path 2) in the same window before starting it. One run at a time: a second run while one is active is refused. A run's first forward pass (prefill, about 10 s on the real model) can't be interrupted, so a cancel during it takes effect when it ends, and the page says so. Equations in model output are typeset with KaTeX, bundled in the repository (MIT license), with untrusted commands disabled.
+
+What has been verified: the server and the engine behind it by 29 automated tests on the synthetic model (one run at a time, invalid inputs, cancellation, cache reset between runs, mode switching, cleanup when the page closes or the engine fails, localhost-only binding, refusing a busy port); the page's math splitting and KaTeX settings by Node.js checks (run by `python -m pytest` when Node.js is installed); and the real model through the same HTTP interface the page uses (`eval/dashboard_smoke.py`: two runs in a row, a live budget change, one comparison). The page itself has not been clicked through in a browser by an automated test; that check is manual.
+
 ### Common errors
 
 | Message | Fix |
@@ -72,6 +84,7 @@ Each run writes a new `results\adaptive_demo_<timestamp>.json`. **To stop a run*
 | `no model store at ...` or preflight says `NOT AVAILABLE` | Set `$env:LEANMOE_MODELS_ROOT` to the folder that contains `qwen1.5-moe-a2.7b-chat-int8`. |
 | `MemoryBudgetExceeded` | The startup memory guard refused the configuration. Lower `--start-gb` and `--start-cache-gb`. Each demo run also shows one deliberate refusal (the oversized fixed-cache example); that one is expected. |
 | `MemoryError` or `Unable to allocate` | Windows ran out of commit headroom. Close other programs and check preflight's commit figure. |
+| Dashboard: `port 8770 is already in use` | Another program uses that port. Start with `--port 8771`. |
 | A path-length error while installing `torch` | Only the optional toy needs torch (`-WithToy`). Clone into a short folder such as `C:\LeanMoE`. |
 
 **Optional toy fallback.** `src/synthetic_moe.py` times disk loads against cache hits on 8 tiny toy layers. It doesn't use the engine and says nothing about real-model performance. It needs torch: run setup with `-WithToy`, then `.\.venv\Scripts\python.exe -m src.synthetic_moe`.
@@ -189,6 +202,7 @@ Decode was faster with the cache in 5 of 6 matched pairs: about 2 times on avera
 - `eval/compare_artifacts.py` — standard-library checker for an uncut and a cut run.
 - `eval/prefetch_ablation.py` — prefetch on/off experiment.
 - `eval/config_compare.py` — BLAS-thread and memory-mapping comparisons.
+- `src/dashboard/` — local evaluation dashboard: `server.py` (127.0.0.1 HTTP server and the single model worker), `static/` (page, scripts, bundled KaTeX), `synthetic.py`, `evidence.py`; launched with `python -m src.dashboard`. `eval/dashboard_smoke.py` — real-model check through its HTTP interface.
 - `src/engine/runtime/streaming.py` and `text_stream.py` — streaming generation (end-of-sequence stop, limits, cancellation, safe incremental text); `eval/stream_demo.py` — command-line example.
 - `tests/` — standard-library tests for the evidence checker and memory accounting; `tests/engine/` — engine tests ported from ExpertRelay (pytest, Windows), run with `python -m pytest`.
 - `configs/` — engine configs, prompt set and prefetch calibrations. `runtime.json` (the engine's default config) and `runtime_cache.json` point at the base store, which these demos don't use.

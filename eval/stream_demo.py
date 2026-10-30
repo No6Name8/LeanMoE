@@ -38,14 +38,15 @@ import threading  # noqa: E402
 import time  # noqa: E402
 from dataclasses import replace  # noqa: E402
 
-from src.engine.runtime.streaming import CancelToken, ContextTooLong, IncrementalDecoder, stream_generate  # noqa: E402
+from src.engine.runtime.streaming import (  # noqa: E402
+    CancelToken, ContextTooLong, IncrementalDecoder, eos_ids_for, stream_generate,
+)  # fmt: skip
 
 SYNTHETIC_CONFIG = {
     "vocab_size": 64, "hidden_size": 32, "num_hidden_layers": 3, "num_attention_heads": 4,
     "num_key_value_heads": 4, "num_experts": 8, "num_experts_per_tok": 2, "moe_intermediate_size": 16,
     "shared_expert_intermediate_size": 24, "norm_topk_prob": False, "rms_norm_eps": 1e-6, "rope_theta": 10000.0,
 }  # fmt: skip
-EOS_TOKENS = ("<|im_end|>", "<|endoftext|>")  # the Chat model's end-of-turn tokens (its generation_config)
 
 
 def synthetic_model(tmp: Path):
@@ -83,7 +84,7 @@ def real_model(args):
     tok = load_tokenizer(store)
     template = ChatTemplate.for_store(store)
     ids = tok.encode(template.user_prompt(args.prompt)).ids
-    eos = {tok.token_to_id(t) for t in EOS_TOKENS} - {None}
+    eos = eos_ids_for(tok)
     print(f"loading the model (cache {args.cache_gb} GB, context {args.max_seq} tokens) ...", flush=True)
     model, info = load_model(store, "cached", rt.max_seq, rt.memory_budget_gb, None, rt)
     print(f"loaded in {info['load_seconds']:.1f}s, {info['cache']['slots']} cached experts", flush=True)

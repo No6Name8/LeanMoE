@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeanMoE Dashboard</title>
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>LeanMoE evaluation dashboard</h1>
+  <p class="sub">Runs the LeanMoE engine on this computer. It is an environment for running workloads and inspecting the engine, not a chatbot. Nothing here is sent anywhere else.</p>
+  <div id="status" class="status" aria-live="polite">Loading status ...</div>
+</header>
+
+<main>
+<section class="panel" id="run-panel">
+  <h2>Run a workload</h2>
+  <label for="prompt">Prompt</label>
+  <textarea id="prompt" rows="4" maxlength="4000">Solve $x^2 - 5x + 6 = 0$.</textarea>
+  <div class="row">
+    <label>Model
+      <select id="source">
+        <option value="real">Real model (Qwen1.5-MoE-A2.7B-Chat, int8)</option>
+        <option value="synthetic">Synthetic engine demonstration (random weights)</option>
+      </select>
+    </label>
+    <label>Mode
+      <select id="mode">
+        <option value="cached">Cached + prefetch (LeanMoE)</option>
+        <option value="mmap">Memory-mapped (Windows paging, no cache)</option>
+      </select>
+    </label>
+    <label>Max new tokens <input id="max-new" type="number" min="1" max="400" value="64"></label>
+  </div>
+  <div class="row real-only">
+    <label>Memory budget (GB) <input id="budget" type="number" min="0.5" step="0.1" value="3.5"></label>
+    <label>Starting expert cache (GB) <input id="start-cache" type="number" min="0.05" step="0.1" value="1.2"></label>
+  </div>
+  <p id="source-note" class="note"></p>
+  <div class="row buttons">
+    <button id="run" type="button">Run</button>
+    <button id="compare" type="button">Compare cached and memory-mapped (same prompt and settings, one after the other)</button>
+    <button id="cancel" type="button" disabled>Cancel</button>
+  </div>
+  <p id="run-message" class="message" aria-live="polite"></p>
+  <div class="row" id="budget-row">
+    <label>Change budget during this run (GB) <input id="live-budget" type="number" min="0.5" step="0.1" value="2.5" disabled></label>
+    <button id="apply-budget" type="button" disabled>Apply</button>
+    <span class="note">Cached mode on the real model only; applied after the current token.</span>
+  </div>
+</section>
+
+<section class="panel" id="output-panel">
+  <h2>Model output <span class="tag warn">unverified</span></h2>
+  <p class="note">Shown exactly as the model generated it. It has not been checked or corrected and may be wrong, including mathematics. Equations are typeset from the model's own LaTeX.</p>
+  <div id="outputs"></div>
+</section>
+
+<section class="panel" id="live-panel">
+  <h2>Live measurements <span class="tag live">measured now on this computer</span></h2>
+  <p class="note">Time to first token is the prompt's first forward pass (prefill). Decode rate is tokens after the first divided by their forward-pass time. Memory: private = committed by this process; working set = in physical RAM. Peaks are sampled every 0.1 s and can miss shorter spikes. The budget is a target the engine plans against, not an enforced limit.</p>
+  <div id="metrics"></div>
+  <div id="compare-result"></div>
+</section>
+
+<section class="panel" id="recorded-panel">
+  <h2>Recorded benchmarks <span class="tag recorded">from committed files, not measured now</span></h2>
+  <p class="note">Measured earlier on the development laptop (8 GB, Windows 11). Read from the result files when the dashboard started. Details and caveats: <a href="/evidence/EVIDENCE.md" target="_blank" rel="noopener noreferrer">results/EVIDENCE.md</a>.</p>
+  <ul id="recorded"></ul>
+</section>
+
+<section class="panel" id="tests-panel">
+  <h2>Engine tests</h2>
+  <p>The engine tests build a tiny random-weight model in a temporary folder and run the real engine code on it (cache resizing, live budget, output preservation, streaming, cancellation). They need no model download. In PowerShell, in the repository folder:</p>
+  <pre>.\.venv\Scripts\python.exe -m pytest</pre>
+  <p>A good run ends with "passed" and no "failed" or "skipped". They test the engine's mechanisms, not the real model's quality or speed.</p>
+</section>
+</main>
+
+<script src="/static/katex/katex.min.js"></script>
+<script src="/static/mathsplit.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

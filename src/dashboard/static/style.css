@@ -1,0 +1,48 @@
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #5b6475; --border: #d9dde5;
+  --accent: #2858c7; --warn-bg: #fff2d6; --warn: #7a4a00; --live-bg: #dff3e6; --live: #145a32;
+  --rec-bg: #e5ebfa; --rec: #23408f; --err: #a1201b; --code-bg: #eef0f4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171d; --panel: #1c2028; --text: #e6e9ef; --muted: #a3abb9; --border: #333a47;
+    --accent: #7ea2ff; --warn-bg: #3d3112; --warn: #ffd88a; --live-bg: #163525; --live: #9fe0b6;
+    --rec-bg: #1d2a4d; --rec: #b5c7ff; --err: #ff9a94; --code-bg: #262b35;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
+header, main { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+header { padding-top: 16px; }
+h1 { font-size: 1.5rem; margin: 0.2em 0; }
+h2 { font-size: 1.1rem; margin: 0 0 0.5em; }
+.sub, .note { color: var(--muted); }
+.note { font-size: 0.9rem; margin: 0.3em 0; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+.status { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 0.9rem; }
+.status .problem { color: var(--err); }
+label { display: block; color: var(--muted); font-size: 0.9rem; }
+.row label { display: inline-block; margin: 6px 14px 6px 0; }
+textarea { width: 100%; font: inherit; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+input, select { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
+input[type=number] { width: 7em; }
+button { font: inherit; padding: 6px 14px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 6px; cursor: pointer; margin: 4px 8px 4px 0; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button#cancel { background: transparent; color: var(--err); border-color: var(--err); }
+.message { min-height: 1.4em; font-weight: 600; }
+.message.error { color: var(--err); }
+.tag { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 10px; vertical-align: middle; margin-left: 6px; }
+.tag.warn { background: var(--warn-bg); color: var(--warn); }
+.tag.live { background: var(--live-bg); color: var(--live); }
+.tag.recorded { background: var(--rec-bg); color: var(--rec); }
+.tag.synthetic { background: var(--warn-bg); color: var(--warn); }
+.output-block { border: 1px solid var(--border); border-radius: 6px; margin: 8px 0; }
+.output-head { padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 0.9rem; color: var(--muted); }
+.output-text { padding: 10px; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 2.5em; }
+.output-text .katex-display { margin: 0.5em 0; overflow-x: auto; overflow-y: hidden; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin: 6px 0; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; width: 40%; }
+pre { background: var(--code-bg); padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
+a { color: var(--accent); }
+@media (max-width: 640px) { .row label { display: block; } th { width: auto; } }

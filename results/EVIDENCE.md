@@ -98,6 +98,17 @@ Same three prompts as the prefetch experiment, 48 new tokens, greedy, adaptive p
 
 Time to first token 10.6 to 24.7 s and decode 1.72 to 1.95 tokens/s (12 threads). Private memory returned to 3.094 to 3.095 GB before each request and peaked at 3.346 to 3.347 GB during each: no growth over the eight sequential requests. These are model answers on a handful of prompts, not a benchmark of the model's quality.
 
+## Dashboard smoke test (`eval/dashboard_smoke.py`)
+
+`dashboard_smoke_20261030-074111.json`: the dashboard server driven over its HTTP interface with the real Chat model, 4 OpenBLAS threads, 3.5 GB budget, 1.2 GB starting cache, prompt "What is 487 × 36?". A functional check, not a benchmark.
+
+- Two cached runs in a row: both stopped at end-of-sequence after 20 tokens. The second reused the loaded model with the cache reset to its starting size (138 experts), but those experts still held weights from the first run, which partly explains its faster first token (5.1 against 8.6 s).
+- A live budget change to 2.5 GB, sent for the second run's request id after its first token, was accepted and shrank the cache from 138 to 34 experts at token 2.
+- One comparison, cached then memory-mapped, each freshly loaded, 16 tokens: identical token ids; first token 5.9 against 19.1 s; sampled peak private memory 3.24 against 0.50 GB and working set 2.86 against 4.96 GB. One run each, so no speed conclusion.
+- After the comparison nothing was loaded and the process's private memory was back to 0.26 GB.
+- An earlier run of this test (not kept) recorded the local store path in its file; the script now records only whether a store was found, and the test was rerun. Its results matched this one in every functional respect.
+- The model's answer was **wrong** in every run: "The product of 487 and 36 is 17,052" (correct: 17,532). The capability audit's prompt "What is 487 × 36? Give the result." was answered correctly; the wording changed the answer.
+
 ## Not measured here
 
 No comparison with a fully cold file cache (the system cache was never cleared), with other prompts or lengths, or on another machine. ExpertRelay's historical results live in that private repository and are not reproduced here.

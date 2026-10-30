@@ -36,11 +36,11 @@ import psutil
 from src.engine.benchmarking import openblas_threads
 from src.engine.runtime.generate import RuntimeConfig, load_model
 from src.engine.runtime.qwen_moe import KVCache
+from src.engine.runtime.streaming import eos_ids_for
 from src.engine.store.chat_template import ChatTemplate
 from src.engine.store.tokenizer import load_tokenizer
 
 CONFIG = REPO_ROOT / "configs" / "runtime_cache_chat.json"
-EOS_IDS = {151645, 151643}  # <|im_end|>, <|endoftext|> (the model's generation_config)
 MAX_NEW_TOKENS = 320
 MAX_SEQ = 640
 CACHE_GB = 1.0
@@ -75,6 +75,7 @@ def mem() -> dict:
 
 
 def answer(model, tok, template, text: str) -> dict:
+    eos = eos_ids_for(tok)
     ids = tok.encode(template.user_prompt(text)).ids
     if len(ids) + MAX_NEW_TOKENS > MAX_SEQ:
         return {"error": f"prompt of {len(ids)} tokens + {MAX_NEW_TOKENS} new exceeds {MAX_SEQ}"}
@@ -91,7 +92,7 @@ def answer(model, tok, template, text: str) -> dict:
         logits, _ = model.forward(np.asarray(feed), cache)
         nxt = int(np.argmax(logits))
         times.append(time.perf_counter() - t)
-        if nxt in EOS_IDS:
+        if nxt in eos:
             stop = "eos"
             break
         out.append(nxt)
