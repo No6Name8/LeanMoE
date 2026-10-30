@@ -226,8 +226,8 @@
       details.append(el("h4", "Limitations"), el("p", it.limitations, "hint"));
       details.appendChild(el("h4", "Source artifacts"));
       const files = el("div", null, "files");
-      for (const f of it.files) {
-        const a = el("a", f); a.href = "/evidence/" + encodeURIComponent(f); a.target = "_blank"; a.rel = "noopener noreferrer";
+      for (const [i, f] of it.files.entries()) {
+        const a = el("a", it.file_labels?.[i] || "Source artifact"); a.href = "/evidence/" + encodeURIComponent(f); a.target = "_blank"; a.rel = "noopener noreferrer";
         files.appendChild(a);
       }
       details.append(files, el("h4", "Reproduction commands (Windows PowerShell)"),

@@ -13,6 +13,12 @@ RESULTS = Path(__file__).resolve().parents[1] / "results"
 def test_committed_results_and_details():
     cards = recorded_evidence(RESULTS)
     assert len(cards) == 4 and [c["additional"] for c in cards] == [False, False, True, True]
+    assert cards[0]["file_labels"] == ["Uncut reference", "Adaptive run"]
+    assert cards[1]["file_labels"] == ["Paging comparison"]
+    for card in cards:
+        assert len(card["files"]) == len(card["file_labels"])
+        assert all((RESULTS / filename).is_file() for filename in card["files"])
+        assert all(".json" not in label and "2026" not in label for label in card["file_labels"])
     assert cards[0]["figure"] == "80/80"
     assert cards[1]["figure"] == "2.07\u00d7"
     assert cards[0]["meaning"] == "Matching output tokens in the recorded cut/uncut pair"

@@ -19,6 +19,27 @@ MMAP_FULL = "config_compare_mmap_full_20261030-060448.json"
 PREFETCH_11 = "prefetch_ablation_20261029-215951.json"
 
 
+ARTIFACT_LABELS = {
+    'adaptive_demo_20261030-060626.json': 'Uncut reference',
+    'adaptive_demo_20261030-060728.json': 'Adaptive run',
+    'adaptive_demo_20261029-220246.json': 'Uncut reference - corrected accounting, 12 threads',
+    'adaptive_demo_20261029-220417.json': 'Adaptive run - corrected accounting, 12 threads',
+    'adaptive_demo_20261029-220548.json': 'Adaptive run - 2.7 GB budget',
+    'adaptive_demo_20261029-205033.json': 'Uncut reference - original accounting',
+    'adaptive_demo_20261029-205224.json': 'Adaptive run - original accounting',
+    'adaptive_demo_20261029-211301.json': 'Independent review - 2.2 GB budget',
+    'adaptive_demo_20261029-200451.json': 'Initial adaptive run - original accounting',
+    'prefetch_ablation_20261029-215951.json': 'Prefetch comparison - 1.1 GB cache',
+    'prefetch_ablation_20261029-214649.json': 'Exploratory prefetch comparison - 0.6 GB cache',
+    'config_compare_blas_explain_20261030-053657.json': 'Thread comparison - explanation prompt',
+    'config_compare_blas_confirm_20261030-054506.json': 'Thread comparison - fact and code prompts',
+    'config_compare_mmap_pilot_20261030-054758.json': 'Paging comparison - pilot',
+    'config_compare_mmap_full_20261030-060448.json': 'Paging comparison',
+    'capability_audit_20261030-064849.json': 'Capability audit - 12 threads',
+    'dashboard_smoke_20261030-074111.json': 'Dashboard functional check',
+}
+
+
 def _load(results: Path, name: str) -> dict | None:
     try:
         data = json.loads((results / name).read_text(encoding="utf-8"))
@@ -29,6 +50,7 @@ def _load(results: Path, name: str) -> dict | None:
 
 def _card(label, files, *, additional=False, limitations="", commands=()):
     return {"label": label, "files": files, "additional": additional,
+            "file_labels": [ARTIFACT_LABELS.get(f, "Source artifact") for f in files],
             "value": "unavailable - source artifacts missing or invalid",
             "limitations": limitations, "commands": list(commands),
             "figure": "unavailable", "meaning": "", "settings": []}

@@ -34,7 +34,6 @@
         ["Status", state],
       ],
       technical: [
-        ["Measured at (UTC)", available(m.measured_at)],
         ["Backend OS", available(m.os)], ["Logical CPU cores", available(m.logical_cores)],
         ["Windows commit - headroom", gb(m.windows_commit?.headroom_gb)],
         ["Windows commit - limit", gb(m.windows_commit?.limit_gb)],

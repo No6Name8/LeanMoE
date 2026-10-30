@@ -31,6 +31,7 @@ status.system.execution_mode="mmap";
 assert.match(view(status,false,now).rows[4][1],/^Running.*Qwen.*Windows paging$/);
 status.busy=false;
 assert.match(view(status,false,now).rows[4][1],/^Idle.*Qwen.*Windows paging$/);
-assert.ok(v.technical.some(r=>r[0]==="Measured at (UTC)" && r[1]===status.system.measured_at));
+assert.ok(!v.technical.some(r=>r[0].includes("Measured at")));
+assert.equal(status.system.measured_at, new Date(now).toISOString());
 assert.ok(v.technical.some(r=>r[0]==="Windows commit - headroom"));
 console.log("system details checks passed");
