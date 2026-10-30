@@ -115,6 +115,23 @@ def test_status_without_a_real_store(server):
     assert "LEANMOE_MODELS_ROOT" in s["real_store"]["problem"]
     assert s["recorded"] and all(item["files"] for item in s["recorded"])  # read from committed files
     assert "Content-Security-Policy" in r.headers
+    assert s["system"]["execution_location"] == "local"
+    assert "path" not in s["real_store"]
+    assert str(server[1].store_dir.parent).replace("\\", "\\\\") not in json.dumps(s)
+
+
+def test_explicit_server_location_and_loaded_mode(server):
+    _, engine = server
+    original = engine.execution_location
+    try:
+        engine.execution_location = "server"
+        stream(server, "/api/generate", body(mode="mmap"))
+        _, s, _ = request(server, "GET", "/api/status")
+        assert s["system"]["execution_location"] == "server"
+        assert s["system"]["loaded_model"] == "Engine test (random weights)"
+        assert s["system"]["execution_mode"] == "mmap"
+    finally:
+        engine.execution_location = original
 
 
 def test_real_model_request_is_refused_without_a_store(server):

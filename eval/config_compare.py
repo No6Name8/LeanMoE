@@ -1,12 +1,13 @@
 """Run matched configurations of the real-model engine and record speed, memory and output.
 
     set LEANMOE_MODELS_ROOT=C:\\path\\to\\models
-    python -m eval.config_compare --stage blas  --prompts explain
+    python -m eval.config_compare --stage blas --baseline-blas 12 --prompts explain
     python -m eval.config_compare --stage mmap  --prompts fact code explain --blas 4
 
 Stages:
   blas  Same total memory budget, cached source with adaptive prefetch, BLAS
-        threads at the default (all cores) versus 4. The cache size follows the
+        threads at the engine default versus 4 (use --baseline-blas 12 to repeat
+        the historical 12-versus-4 configuration). The cache size follows the
         normal budget calculation (budget minus the engine's estimate of the
         rest of the process), and that estimate includes the memory committed
         at import, which depends on the BLAS thread count. This compares two
@@ -174,7 +175,7 @@ def run_one(mode: str, blas: int | None, prompt_id: str, args: argparse.Namespac
 
 def configs_for(args: argparse.Namespace) -> list[tuple[str, int | None]]:
     if args.stage == "blas":
-        return [("cached", None), ("cached", 4)]
+        return [("cached", getattr(args, "baseline_blas", None)), ("cached", 4)]
     return [("mmap", args.blas), ("cached", args.blas)]
 
 
@@ -205,10 +206,12 @@ def main() -> None:
     ap.add_argument("--child", type=Path, default=None, help=argparse.SUPPRESS)
     ap.add_argument("--stage", choices=["blas", "mmap"])
     ap.add_argument("--prompts", nargs="+", choices=list(PROMPTS), default=["explain"])
+    ap.add_argument("--baseline-blas", type=int, choices=range(1, 257), default=None, metavar="N",
+                    help="blas stage: explicit baseline thread count (default: library default); use 12 for the historical experiment")
     ap.add_argument("--rounds", type=int, default=2)
     ap.add_argument("--tokens", type=int, default=48)
     ap.add_argument("--budget-gb", type=float, default=3.0, help="total memory budget for every configuration")
-    ap.add_argument("--blas", type=int, default=None, help="mmap stage: BLAS threads for both modes (default: all cores)")
+    ap.add_argument("--blas", type=int, default=None, help="mmap stage: BLAS threads for both modes (default: engine default)")
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--label", default=None)
     args = ap.parse_args()

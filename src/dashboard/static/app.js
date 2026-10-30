@@ -170,34 +170,64 @@
     for (const p of ["run", "cmp"]) $(p + "-missing-detail").textContent = ok ? "" : s.real_store.problem;
     updateSelection();
     $("max-seq").textContent = s.limits.max_seq;
+    const m = s.system || {};
+    document.querySelector(".tagline").textContent = m.execution_location === "local" ? "Local engine dashboard" :
+      m.execution_location === "server" ? "Server engine dashboard" : "Engine dashboard";
+    $("live-location").textContent = m.execution_location === "local" ? "measured on the local backend" :
+      m.execution_location === "server" ? "measured on the server backend" : "backend location unavailable";
+    const available = (v) => v === null || v === undefined || v === "" ? "unavailable" : String(v);
+    const gb = (v) => v === null || v === undefined ? "unavailable" : `${fmt(v, 3)} GB`;
+    const mode = (v) => ({cached: "LeanMoE (cache + prefetch)", mmap: "Windows paging"}[v] || "unavailable");
     setKV($("system-details"), [
-      ["Qwen model store", ok ? s.real_store.path : "not available"],
-      ...(ok ? [] : [["How to set it up", s.real_store.problem]]),
-      ["OpenBLAS / numba threads", `${s.threads.openblas} / ${s.threads.numba}`],
-      ["System RAM", `${fmt(s.memory.system_available_gb)} GB free of ${fmt(s.memory.system_total_gb)} GB`],
-      ["This server process", `private ${fmt(s.memory.private_gb)} GB, working set ${fmt(s.memory.working_set_gb)} GB`],
-      ["Loaded now", s.loaded ? `${s.loaded.source}, ${s.loaded.mode}` : "nothing"],
-      ["Context limit", `${s.limits.max_seq} tokens (prompt + output)`],
+      ["Execution location (configured)", {local: "Local computer - backend", server: "Server - backend (not this browser's computer)"}[m.execution_location] || "unavailable"],
+      ["Measured at (UTC)", available(m.measured_at)],
+      ["Backend OS", available(m.os)], ["Backend CPU", available(m.cpu)],
+      ["Logical CPU cores", available(m.logical_cores)],
+      ["Physical RAM - total", gb(m.ram_total_gb)],
+      ["Physical RAM - available", gb(m.ram_available_gb)],
+      ["Windows commit - headroom", gb(m.windows_commit?.headroom_gb)],
+      ["Windows commit - limit", gb(m.windows_commit?.limit_gb)],
+      ["Process private - committed", gb(m.process_private_gb)],
+      ["Process working set - in RAM", gb(m.process_working_set_gb)],
+      ["Effective OpenBLAS threads", available(m.threads?.openblas)],
+      ["Effective numba threads", available(m.threads?.numba)],
+      ["Loaded model", available(m.loaded_model)],
+      ["Loaded execution mode", m.loaded_model === "none" ? "none" : mode(m.execution_mode)],
+      ["Active request mode", s.busy ? mode(m.active_mode) : "none"],
+      ["Memory units", "GB = 1,000,000,000 bytes; snapshot, not peak. Commit headroom is system-wide allocation capacity, not free RAM."],
     ]);
-    renderRecorded(s.recorded);
+    // Avoid replacing open methodology panels when system data is refreshed.
+    const recordedKey = JSON.stringify(s.recorded);
+    if (ui.recordedKey !== recordedKey) { renderRecorded(s.recorded); ui.recordedKey = recordedKey; }
   }
 
   function renderRecorded(items) {
-    const ul = $("recorded");
-    ul.textContent = "";
-    if (!items || !items.length) { ul.appendChild(el("li", "No recorded result files found.")); return; }
-    for (const it of items) {
-      const li = el("li");
-      li.append(el("strong", it.label), el("div", it.value));
+    $("recorded").textContent = "";
+    $("additional-recorded").textContent = "";
+    for (const it of items || []) {
+      const card = el("article", null, "card experiment");
+      card.append(el("h3", it.label), el("p", it.value, "result"));
+      const details = el("details", null, "details compact");
+      details.appendChild(el("summary", "Methodology, limits & reproduce"));
+      for (const [title, text] of [["Methodology", it.methodology], ["Limitations", it.limitations]]) {
+        details.append(el("h4", title), el("p", text, "hint"));
+      }
+      details.appendChild(el("h4", "Source artifacts"));
       const files = el("div", null, "files");
       for (const f of it.files) {
         const a = el("a", f); a.href = "/evidence/" + encodeURIComponent(f); a.target = "_blank"; a.rel = "noopener noreferrer";
         files.appendChild(a);
       }
-      li.appendChild(files);
-      ul.appendChild(li);
+      details.append(files, el("h4", "Reproduction commands (Windows PowerShell)"),
+        el("p", "Use the .venv created by setup. The saved-artifact checker needs no model and runs no inference. Real-model commands need the external int8 store; set LEANMOE_MODELS_ROOT in that shell. They create new result files and can take minutes. Reproduction on a second machine and rebuilding the store from this repository remain unverified.", "hint"));
+      details.appendChild(el("pre", it.commands.join("\n")));
+      if (it.additional) details.appendChild(el("p", "Run historical thread settings in a separate PowerShell window; close it afterwards to avoid changing your dashboard's thread settings.", "hint"));
+      card.appendChild(details);
+      $(it.additional ? "additional-recorded" : "recorded").appendChild(card);
     }
   }
+  sysDetails.addEventListener("toggle", () => { if (sysDetails.open) loadStatus(); });
+  setInterval(() => { if (sysDetails.open) loadStatus(); }, 5000);
 
   // ------------------------------------------------------------ Run tab
 
@@ -332,7 +362,8 @@
     if (!r || !r.start || !r.done) return;
     const record = {
       kind: "leanmoe-dashboard-run",
-      note: "Live run on this computer, as reported by the LeanMoE server. Model output is unverified.",
+      note: "Live run reported by the LeanMoE backend. Model output is unverified.",
+      execution_location: ui.status?.system?.execution_location || "unavailable",
       downloaded_at: new Date().toISOString(),
       request: r.start,
       budget_events: r.budget,

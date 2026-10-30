@@ -8,6 +8,8 @@
 
 param(
     [int]$Port = 8770,
+    [ValidateSet("local", "server")]
+    [string]$ExecutionLocation = "local",
     [switch]$NoOpen
 )
 
@@ -19,7 +21,7 @@ if (-not (Test-Path $VenvPython)) {
     Write-Host "  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1"
     exit 1
 }
-$dashArgs = @("-m", "src.dashboard", "--port", "$Port")
+$dashArgs = @("-m", "src.dashboard", "--port", "$Port", "--execution-location", $ExecutionLocation)
 if (-not $NoOpen) { $dashArgs += "--open" }
 & $VenvPython @dashArgs
 exit $LASTEXITCODE

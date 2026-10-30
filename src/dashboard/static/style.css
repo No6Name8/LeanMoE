@@ -174,3 +174,16 @@ a { color: var(--accent); }
 .explain-item .more { font-size: 0.8rem; color: var(--muted); }
 .nowrap { white-space: nowrap; }
 .check { flex-wrap: wrap; }
+
+/* System snapshot stays within the viewport, including long phone layouts. */
+.details.inline[open] .kv { width: min(560px, 94vw); max-height: 72vh; overflow-y: auto; }
+.experiment h3 { font-size: 1rem; margin: 0 0 8px; }
+.experiment h4 { font-size: .9rem; margin: 14px 0 4px; }
+.experiment .result { margin: 0; font-weight: 600; }
+.experiment .files a { display: block; overflow-wrap: anywhere; font-size: .85rem; }
+.experiment pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .82rem; }
+.evidence-intro p { margin: 8px 0; }
+#additional-recorded { margin-top: 12px; }
+@media (max-width: 720px) {
+  .details.inline[open] .kv { position: fixed; left: 12px; right: 12px; top: 120px; width: auto; max-height: calc(100dvh - 136px); }
+}

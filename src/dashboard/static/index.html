@@ -12,7 +12,7 @@
 <header class="top">
   <div class="brand">
     <h1>LeanMoE</h1>
-    <span class="tagline">Local engine dashboard</span>
+    <span class="tagline">Engine dashboard</span>
   </div>
   <div class="system">
     <span id="store-pill" class="pill">Checking model…</span>
@@ -63,7 +63,7 @@
         </details>
         <div class="missing" id="run-missing" hidden>
           <strong>Qwen not installed</strong>
-          <span>The Qwen model store wasn't found on this computer.</span>
+          <span>The Qwen model store wasn't found on the backend.</span>
           <details class="details compact"><summary>How to install it</summary>
             <p class="hint" id="run-missing-detail"></p>
           </details>
@@ -122,7 +122,7 @@
           <div class="metric"><span class="metric-label">Decode speed</span><span class="metric-value" id="m-decode">—</span></div>
           <div class="metric"><span class="metric-label">Private memory</span><span class="metric-value" id="m-mem">—</span></div>
         </div>
-        <p class="hint center"><span class="badge live">Live</span> measured now on this computer</p>
+        <p class="hint center"><span class="badge live">Live</span> <span id="live-location">measured on the backend</span></p>
 
         <div class="card answer" id="run-answer-card">
           <div class="answer-head">
@@ -159,7 +159,7 @@
         </details>
         <div class="missing" id="cmp-missing" hidden>
           <strong>Qwen not installed</strong>
-          <span>The Qwen model store wasn't found on this computer.</span>
+          <span>The Qwen model store wasn't found on the backend.</span>
           <details class="details compact"><summary>How to install it</summary>
             <p class="hint" id="cmp-missing-detail"></p>
           </details>
@@ -203,21 +203,29 @@
 
   <!-- ============================== EVIDENCE ============================== -->
   <section id="panel-evidence" role="tabpanel" aria-labelledby="tab-evidence" class="tabpanel" hidden>
-    <div class="card">
-      <div class="answer-head"><strong>Recorded benchmarks</strong><span class="badge recorded">Recorded</span></div>
-      <p class="hint">From committed result files, measured earlier on the development laptop. Not measured now.</p>
-      <ul id="recorded" class="recorded"></ul>
-      <p><a href="/evidence/EVIDENCE.md" target="_blank" rel="noopener noreferrer">All evidence files and their limits (EVIDENCE.md)</a></p>
+    <div class="card evidence-intro">
+      <div class="answer-head"><strong>What the recorded experiments show</strong><span class="badge recorded">Recorded</span></div>
+      <p>LeanMoE keeps useful experts in a RAM cache and reads likely next experts early. Windows paging maps the same weights and lets Windows bring pages into RAM.</p>
+      <p class="hint">We measure decode tokens/s, first-token time, and process memory. Matching tokens establishes execution consistency for the tested prompt and settings; it does not establish that an answer is correct.</p>
+      <details class="details compact"><summary>Historical hardware, definitions &amp; attribution</summary>
+        <p class="hint">Recorded on 29-30 October 2026: one Windows laptop, Intel Core i5-12450H, 8.30 GB RAM, NVMe SSD; Qwen1.5-MoE-A2.7B-Chat int8, numpy, fused kernel, greedy decoding. Source: the committed EVIDENCE.md. This is historical context, not a reading of the current backend. Live measurements are in System details.</p>
+        <p class="hint">Decode rate excludes prefill and loading. First-token timing in these experiments is the prefill forward pass, not end-to-end startup. Private memory is process commit; working set is physical RAM residency, including mapped pages. Sampled peaks can miss brief allocations.</p>
+        <p class="hint">The store, cache, prefetch predictor, LiveBudget and memory guard are prior work from Abdullah Ali Alanazi's ExpertRelay (2026). LeanMoE adds the port, evaluation, memory-accounting correction, thread tuning and dashboard.</p>
+        <a href="https://doi.org/10.5281/zenodo.22980838" target="_blank" rel="noopener noreferrer">ExpertRelay concept note</a>
+      </details>
     </div>
-    <div class="card">
-      <strong>Engine tests</strong>
-      <p class="hint">Build a tiny random-weight model and run the real engine on it. No download needed.</p>
-      <pre>.\.venv\Scripts\python.exe -m pytest</pre>
-      <p class="hint">Success: ends with "passed", with no "failed" or "skipped".</p>
-    </div>
+    <div id="recorded" aria-label="Main experiments"></div>
+    <details class="details" id="additional-experiments">
+      <summary>Additional experiments</summary>
+      <div id="additional-recorded"></div>
+      <p class="hint">Earlier budget-cut pairs, the exploratory small-cache run, capability audit and dashboard smoke check remain in the evidence index, including unfavorable and superseded results.</p>
+      <a href="/evidence/EVIDENCE.md" target="_blank" rel="noopener noreferrer">Full evidence index, older artifacts &amp; limitations</a>
+    </details>
     <details class="details">
-      <summary>What these results do and don't show</summary>
-      <p class="hint">Recorded results come from one 8 GB Windows laptop and a few prompts. Output equality was tested for those prompts with greedy decoding; it is not a general correctness guarantee. Timings vary with background load and with Windows' file cache. The engine tests check its mechanisms on a synthetic model, not the real model's quality or speed. See EVIDENCE.md for each file's settings and caveats.</p>
+      <summary>Verify the engine without downloading the model</summary>
+      <p class="hint">Tests build a tiny random-weight model and exercise the real engine. They check mechanisms, not real-model quality or speed. Skipped checks are unverified.</p>
+      <pre>powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1
+.\.venv\Scripts\python.exe -m pytest</pre>
     </details>
   </section>
 </main>

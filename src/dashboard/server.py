@@ -38,6 +38,7 @@ from src.engine.benchmarking import openblas_threads, process_private_bytes
 from src.engine.cache.expert_cache import CachedExpertSource
 from src.engine.paths import MODELS_ROOT
 from src.dashboard.evidence import recorded_evidence
+from src.dashboard.system import snapshot, optional
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8770
@@ -130,9 +131,12 @@ class Sampler(threading.Thread):
 class Engine:
     """Owns the loaded model and the busy lock. Only the worker thread touches the model."""
 
-    def __init__(self, models_root: Path | None = None) -> None:
+    def __init__(self, models_root: Path | None = None, execution_location: str = "local") -> None:
         from src.engine.runtime.generate import RuntimeConfig
 
+        if execution_location not in ("local", "server"):
+            raise ValueError("execution_location must be local or server")
+        self.execution_location = execution_location
         self.busy = threading.Lock()
         self.active: Request | None = None
         self.jobs: queue.Queue = queue.Queue()
@@ -156,7 +160,7 @@ class Engine:
         missing = [f for f in ("store.json", "experts.bin", "resident.bin", "experts_index.json",
                                "resident_index.json") if not (self.store_dir / f).exists()]  # fmt: skip
         if missing:
-            return (f"No complete real-model store at {self.store_dir} (missing {', '.join(missing)}). "
+            return (f"No complete real-model store (missing {', '.join(missing)}). "
                     "Set LEANMOE_MODELS_ROOT to the folder that contains qwen1.5-moe-a2.7b-chat-int8 and "
                     "restart the dashboard; see the README section 'Path 2: the full model'.")  # fmt: skip
         try:
@@ -168,7 +172,7 @@ class Engine:
             self.template = ChatTemplate.for_store(self.store_dir)
             self.eos = eos_ids_for(self.tokenizer)
         except Exception as e:  # noqa: BLE001 - reported on the page
-            return f"The real-model store at {self.store_dir} could not be prepared: {type(e).__name__}: {e}"
+            return f"The real-model store could not be prepared ({type(e).__name__}). Check the store and LEANMOE_MODELS_ROOT configuration."
         return None
 
     def synthetic_dir(self) -> Path:
@@ -445,20 +449,22 @@ class Engine:
                                              "decode_tokens_per_s", "load_seconds", "memory")} for r in results]})  # fmt: skip
 
     def status(self) -> dict:
-        import numba
-
         req = self.active
+        threads = {"openblas": optional(openblas_threads), "numba": optional(_numba_threads)}
+        loaded = None if self.loaded_key is None else {"source": self.loaded_key[0], "mode": self.loaded_key[1]}
+        system = snapshot(self.execution_location, threads, loaded, req)
         return {
+            "system": system,
             "busy": req is not None,
             "active": None if req is None else {"request_id": req.id, "kind": req.kind, "source": req.source,
                                                 "mode": req.mode, "phase": req.phase,
                                                 "seconds": time.perf_counter() - req.started},  # fmt: skip
             "loaded": None if self.loaded_key is None else {"source": self.loaded_key[0], "mode": self.loaded_key[1]},
-            "real_store": {"path": str(self.store_dir), "available": self.store_problem is None,
+            "real_store": {"available": self.store_problem is None,
                            "problem": self.store_problem},  # fmt: skip
-            "threads": {"openblas": openblas_threads(), "numba": numba.get_num_threads()},
-            "memory": {**process_memory(), "system_available_gb": psutil.virtual_memory().available / GB,
-                       "system_total_gb": psutil.virtual_memory().total / GB},  # fmt: skip
+            "threads": threads,
+            "memory": {"private_gb": system["process_private_gb"], "working_set_gb": system["process_working_set_gb"],
+                       "system_available_gb": system["ram_available_gb"], "system_total_gb": system["ram_total_gb"]},  # fmt: skip
             "limits": {"max_seq": MAX_SEQ, "max_new_tokens": MAX_NEW_TOKENS, "max_prompt_chars": MAX_PROMPT_CHARS,
                        "default_budget_gb": DEFAULT_BUDGET_GB, "default_start_cache_gb": DEFAULT_START_CACHE_GB},  # fmt: skip
             "recorded": recorded_evidence(RESULTS_DIR),
@@ -613,7 +619,7 @@ class LocalServer(ThreadingHTTPServer):
         super().server_bind()
 
 
-def serve(port: int = DEFAULT_PORT, models_root: Path | None = None) -> tuple[ThreadingHTTPServer, Engine]:
+def serve(port: int = DEFAULT_PORT, models_root: Path | None = None, *, execution_location: str = "local") -> tuple[ThreadingHTTPServer, Engine]:
     """Bind 127.0.0.1:port (0 = any free port) and return the server and its engine."""
     if port:
         import socket
@@ -624,7 +630,7 @@ def serve(port: int = DEFAULT_PORT, models_root: Path | None = None) -> tuple[Th
             probe.settimeout(0.5)
             if probe.connect_ex((HOST, port)) == 0:
                 raise OSError(f"port {port} is already in use by another program")
-    engine = Engine(models_root)
+    engine = Engine(models_root, execution_location)
     server = LocalServer((HOST, port), BaseHTTPRequestHandler)
     server.RequestHandlerClass = make_handler(engine, server.server_address[1])  # the port actually bound
     server.daemon_threads = True
