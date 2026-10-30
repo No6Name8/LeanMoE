@@ -15,6 +15,7 @@
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }  /* never let a display rule override hidden */
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 "Segoe UI", system-ui, sans-serif; }
 .top, .tabs, main { max-width: 980px; margin: 0 auto; padding-left: 20px; padding-right: 20px; }
 .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 22px; }
@@ -151,3 +152,25 @@ a { color: var(--accent); }
   .explain { position: static; margin-bottom: 16px; }
   .choice-label { width: auto; }
 }
+
+/* ---- compact controls (one height for buttons, segmented options and chips) ---- */
+.primary, .ghost, .secondary, .segmented button, .model-chip { font-size: 0.92rem; line-height: 1.2; padding: 6px 14px; min-height: 32px; }
+.primary { padding: 6px 18px; }
+.primary.small, .secondary.small { padding: 4px 12px; min-height: 28px; font-size: 0.88rem; }
+.secondary { background: var(--surface); color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; font-weight: 600; }
+.model-chip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+.model-chip.test { background: var(--syn-bg); color: var(--syn); box-shadow: inset 0 -2px 0 var(--syn); }
+.model-chip.unavailable { box-shadow: none; color: var(--muted); text-decoration: line-through; }
+.details.compact { margin: 10px 0 0; }
+.details.compact > summary { font-size: 0.9rem; padding: 2px 0; }
+.check { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; font-size: 0.92rem; color: var(--text); }
+.check .hint { margin: 0; }
+.missing { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 0.9rem; }
+.missing strong { color: var(--err); }
+.missing .details.compact { flex-basis: 100%; margin: 0; }
+.missing .details.compact .hint { color: var(--warn); }
+.explain-item .more { margin-top: 4px; }
+.explain-item .more > summary { cursor: pointer; font-size: 0.8rem; color: var(--accent); font-weight: 600; }
+.explain-item .more { font-size: 0.8rem; color: var(--muted); }
+.nowrap { white-space: nowrap; }
+.check { flex-wrap: wrap; }

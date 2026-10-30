@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(Number(v))) ? "—" : Number(v).toFixed(d);
   const pick = { source: "real", mode: "cached", "cmp-source": "real" };
-  const ui = { status: null, run: null, cmp: null };
+  const ui = { status: null, run: null, cmp: null, qwenMissing: false, busy: false };
 
   // ------------------------------------------------------------ small helpers
 
@@ -106,21 +106,47 @@
     });
   });
 
-  const SOURCE_SHORT = { real: "Qwen", synthetic: "Tiny model" };
+  const SOURCE_SHORT = { real: "Qwen", synthetic: "Engine test" };
   const MODE_SHORT = { cached: "LeanMoE", mmap: "Windows paging" };
-  const SOURCE_LONG = { real: "Qwen — real model (Qwen1.5-MoE-A2.7B-Chat, int8)", synthetic: "Tiny model — engine test (random weights)" };
-  const MODE_LONG = { cached: "LeanMoE — cache + prefetch", mmap: "Baseline — Windows paging (memory-mapped)" };
+  const SOURCE_LONG = { real: "Qwen (Qwen1.5-MoE-A2.7B-Chat, int8)", synthetic: "Engine test (tiny random-weight model; meaningless output)" };
+  const MODE_LONG = { cached: "LeanMoE (expert cache + prefetch)", mmap: "Windows paging (memory-mapped baseline)" };
 
+  // The model is Qwen unless "Engine test" is ticked under Advanced. Nothing switches it automatically.
   function updateSelection() {
+    for (const [p, key] of [["run", "source"], ["cmp", "cmp-source"]]) {
+      const test = $(p + "-engine-test").checked;
+      pick[key] = test ? "synthetic" : "real";
+      const chip = $(p + "-model-chip");
+      chip.textContent = test ? "Engine test · meaningless output" : "Qwen";
+      chip.className = "model-chip" + (test ? " test" : (ui.qwenMissing ? " unavailable" : ""));
+      $(p + "-missing").hidden = !(ui.qwenMissing && !test);
+    }
     const b = $("run-source-badge");
     const syn = pick.source === "synthetic";
-    b.textContent = syn ? "Tiny model: meaningless output" : "Qwen";
+    b.textContent = syn ? "Engine test: meaningless output" : "Qwen";
     b.className = "badge" + (syn ? " synthetic" : "");
     $("run-selection").textContent = `Model: ${SOURCE_SHORT[pick.source]} · Method: ${MODE_SHORT[pick.mode]}`;
     document.querySelectorAll(".explain-item").forEach((it) => {
       const on = pick[it.dataset.group] === it.dataset.value;
       it.classList.toggle("selected", on);
       if (on) it.setAttribute("aria-current", "true"); else it.removeAttribute("aria-current");
+    });
+    refreshButtons();
+  }
+
+  function refreshButtons() {
+    const runBlocked = ui.qwenMissing && pick.source === "real";
+    const cmpBlocked = ui.qwenMissing && pick["cmp-source"] === "real";
+    $("run").disabled = ui.busy || runBlocked;
+    $("compare").disabled = ui.busy || cmpBlocked;
+  }
+
+  for (const p of ["run", "cmp"]) {
+    $(p + "-engine-test").addEventListener("change", updateSelection);
+    $(p + "-use-test").addEventListener("click", () => {
+      $(p + "-engine-test").checked = true;
+      $(p + "-advanced").open = true;
+      updateSelection();
     });
   }
 
@@ -138,13 +164,11 @@
     }
     ui.status = s;
     const ok = s.real_store.available;
-    $("store-pill").textContent = ok ? "Qwen ready" : "Qwen not configured: tiny model only";
+    $("store-pill").textContent = ok ? "Qwen ready" : "Qwen not installed";
     $("store-pill").className = "pill " + (ok ? "ok" : "no");
-    for (const g of ["source", "cmp-source"]) {
-      const real = document.querySelector(`.segmented button[data-group="${g}"][data-value="real"]`);
-      real.disabled = !ok;
-      if (!ok && pick[g] === "real") document.querySelector(`.segmented button[data-group="${g}"][data-value="synthetic"]`).click();
-    }
+    ui.qwenMissing = !ok;
+    for (const p of ["run", "cmp"]) $(p + "-missing-detail").textContent = ok ? "" : s.real_store.problem;
+    updateSelection();
     $("max-seq").textContent = s.limits.max_seq;
     setKV($("system-details"), [
       ["Qwen model store", ok ? s.real_store.path : "not available"],
@@ -195,7 +219,7 @@
     $("run-confirm").hidden = true; $("run-confirm").textContent = "";
     $("budget-card").hidden = true; $("budget-msg").textContent = ""; $("budget-cache").textContent = "Cache: —";
     setState("run-state", "Starting…", "busy");
-    $("run").disabled = true; $("compare").disabled = true;
+    ui.busy = true; refreshButtons();
     let resp;
     try {
       resp = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -213,7 +237,7 @@
 
   function endRun(errorText) {
     if (errorText) { setError("run-error", errorText); setState("run-state", "Idle", "idle"); }
-    $("run").disabled = false; $("compare").disabled = false; $("run-cancel").disabled = true;
+    ui.busy = false; refreshButtons(); $("run-cancel").disabled = true;
     $("budget-card").hidden = true;
     if (ui.run) ui.run.requestId = null;
     loadStatus();
@@ -366,7 +390,7 @@
     $("cmp-match").hidden = true; setKV($("cmp-details"), []);
     $("cmp-confirm").hidden = true; $("cmp-confirm").textContent = "";
     setState("cmp-state", "Starting…", "busy");
-    $("compare").disabled = true; $("run").disabled = true;
+    ui.busy = true; refreshButtons();
     let resp;
     try {
       resp = await fetch("/api/compare", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -384,7 +408,7 @@
 
   function endCompare(errorText) {
     if (errorText) { setError("cmp-error", errorText); setState("cmp-state", "Idle", "idle"); }
-    $("compare").disabled = false; $("run").disabled = false; $("cmp-cancel").disabled = true;
+    ui.busy = false; refreshButtons(); $("cmp-cancel").disabled = true;
     if (ui.cmp) ui.cmp.requestId = null;
     loadStatus();
   }

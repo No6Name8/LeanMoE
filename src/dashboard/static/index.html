@@ -48,17 +48,26 @@
         <textarea id="run-prompt" rows="3" maxlength="4000">Solve $x^2 - 5x + 6 = 0$.</textarea>
         <div class="choice">
           <span class="choice-label">Model</span>
-          <div class="segmented" role="radiogroup" aria-label="Model">
-            <button type="button" role="radio" data-group="source" data-value="real" aria-checked="true">Qwen — real model</button>
-            <button type="button" role="radio" data-group="source" data-value="synthetic" aria-checked="false">Tiny model — engine test</button>
-          </div>
+          <span class="model-chip" id="run-model-chip">Qwen</span>
         </div>
         <div class="choice">
           <span class="choice-label">Execution</span>
           <div class="segmented" role="radiogroup" aria-label="Execution">
-            <button type="button" role="radio" data-group="mode" data-value="cached" aria-checked="true">LeanMoE — cache + prefetch</button>
-            <button type="button" role="radio" data-group="mode" data-value="mmap" aria-checked="false">Baseline — Windows paging</button>
+            <button type="button" role="radio" data-group="mode" data-value="cached" aria-checked="true">LeanMoE</button>
+            <button type="button" role="radio" data-group="mode" data-value="mmap" aria-checked="false">Windows paging</button>
           </div>
+        </div>
+        <details class="details compact advanced" id="run-advanced">
+          <summary>Advanced</summary>
+          <label class="check"><input type="checkbox" id="run-engine-test"> <span class="nowrap">Engine test</span> <span class="hint">(tiny random-weight model; meaningless output)</span></label>
+        </details>
+        <div class="missing" id="run-missing" hidden>
+          <strong>Qwen not installed</strong>
+          <span>The Qwen model store wasn't found on this computer.</span>
+          <details class="details compact"><summary>How to install it</summary>
+            <p class="hint" id="run-missing-detail"></p>
+          </details>
+          <button type="button" class="secondary small" id="run-use-test">Use engine test instead</button>
         </div>
         <div class="controls">
           <span id="run-selection" class="selection">Model: Qwen · Method: LeanMoE</span>
@@ -72,16 +81,28 @@
 
       <details class="area-aside explain" id="explain" open>
         <summary>What am I running?</summary>
-        <p class="explain-lead">The model supplies the answers; the execution method decides how its weights reach memory.</p>
+        <p class="explain-lead">Qwen supplies the answers. LeanMoE or Windows paging decides how its weights get into memory.</p>
         <div class="explain-group">
           <span class="explain-head">Model</span>
-          <div class="explain-item" data-group="source" data-value="real"><strong>Qwen</strong> The real pretrained model (Qwen1.5-MoE-A2.7B-Chat, int8) generating answers on this machine.</div>
-          <div class="explain-item" data-group="source" data-value="synthetic"><strong>Tiny model</strong> Random weights for testing engine behaviour without the large download; its output is meaningless.</div>
+          <div class="explain-item" data-group="source" data-value="real">
+            <strong>Qwen</strong> Qwen1.5-MoE-A2.7B-Chat, int8. The pretrained model that generates the answers.
+            <details class="more"><summary>Details</summary>A mixture-of-experts model: 24 layers of 60 routed experts, 4 used per token, plus a shared expert. Int8 weights: 14.36 GB on disk. Model by the Qwen team (Tongyi Qianwen license).</details>
+          </div>
+          <div class="explain-item" data-group="source" data-value="synthetic">
+            <strong>Engine test</strong> A tiny random-weight model that tests the engine without the large download. Its output is meaningless.
+            <details class="more"><summary>Details</summary>Built in a temporary folder when first used: 3 layers of 8 experts. It runs the same engine code (store reads, cache, prefetch, cancellation) as Qwen. In Advanced.</details>
+          </div>
         </div>
         <div class="explain-group">
           <span class="explain-head">Execution</span>
-          <div class="explain-item" data-group="mode" data-value="cached"><strong>LeanMoE</strong> Our ExpertRelay-derived method: caches experts in RAM and prefetches likely upcoming experts.</div>
-          <div class="explain-item" data-group="mode" data-value="mmap"><strong>Windows paging</strong> The baseline: memory-mapped expert files, without our expert cache or prefetch.</div>
+          <div class="explain-item" data-group="mode" data-value="cached">
+            <strong>LeanMoE</strong> Our ExpertRelay-derived method: keeps experts in a RAM cache and prefetches likely upcoming ones.
+            <details class="more"><summary>Details</summary>Experts are read from the SSD with unbuffered I/O into a fixed-size cache; a predictor starts reading the next layer's likely experts early. The cache can shrink or grow during a run when the memory budget changes.</details>
+          </div>
+          <div class="explain-item" data-group="mode" data-value="mmap">
+            <strong>Windows paging</strong> The baseline: memory-mapped expert files, without our cache or prefetch.
+            <details class="more"><summary>Details</summary>The whole model file is memory-mapped and Windows loads pages on demand, keeping them in its file cache. Speed depends on what is already cached; private memory is low, physical RAM use can be high.</details>
+          </div>
         </div>
       </details>
 
@@ -130,15 +151,24 @@
       <textarea id="cmp-prompt" rows="3" maxlength="4000">What is the capital of France? Answer in one sentence.</textarea>
       <div class="choice">
         <span class="choice-label">Model</span>
-        <div class="segmented" role="radiogroup" aria-label="Model for comparison">
-          <button type="button" role="radio" data-group="cmp-source" data-value="real" aria-checked="true">Qwen — real model</button>
-          <button type="button" role="radio" data-group="cmp-source" data-value="synthetic" aria-checked="false">Tiny model — engine test</button>
-        </div>
+        <span class="model-chip" id="cmp-model-chip">Qwen</span>
       </div>
+      <details class="details compact advanced" id="cmp-advanced">
+          <summary>Advanced</summary>
+          <label class="check"><input type="checkbox" id="cmp-engine-test"> <span class="nowrap">Engine test</span> <span class="hint">(tiny random-weight model; meaningless output)</span></label>
+        </details>
+        <div class="missing" id="cmp-missing" hidden>
+          <strong>Qwen not installed</strong>
+          <span>The Qwen model store wasn't found on this computer.</span>
+          <details class="details compact"><summary>How to install it</summary>
+            <p class="hint" id="cmp-missing-detail"></p>
+          </details>
+          <button type="button" class="secondary small" id="cmp-use-test">Use engine test instead</button>
+        </div>
       <div class="controls">
-        <span class="selection">Runs LeanMoE, then Windows paging, with the same prompt and settings</span>
+        <span class="selection">LeanMoE, then Windows paging, same prompt and settings</span>
         <div class="actions">
-          <button type="button" id="compare" class="primary">Compare modes</button>
+          <button type="button" id="compare" class="primary">Compare</button>
           <button type="button" id="cmp-cancel" class="ghost" disabled>Cancel</button>
         </div>
       </div>
@@ -153,12 +183,12 @@
 
     <div class="side-by-side">
       <div class="card answer" data-run="cached">
-        <div class="answer-head"><strong>LeanMoE — cache + prefetch</strong><span class="badge live">Live</span><span class="badge warn">Unverified</span></div>
+        <div class="answer-head"><strong>LeanMoE</strong><span class="badge live">Live</span><span class="badge warn">Unverified</span></div>
         <div class="mini-metrics"><span>First token <b class="v-ttft">—</b></span><span>Decode <b class="v-decode">—</b></span><span>Private peak <b class="v-mem">—</b></span></div>
         <div class="answer-text"><span class="placeholder">Not run yet.</span></div>
       </div>
       <div class="card answer" data-run="mmap">
-        <div class="answer-head"><strong>Baseline — Windows paging</strong><span class="badge live">Live</span><span class="badge warn">Unverified</span></div>
+        <div class="answer-head"><strong>Windows paging</strong><span class="badge live">Live</span><span class="badge warn">Unverified</span></div>
         <div class="mini-metrics"><span>First token <b class="v-ttft">—</b></span><span>Decode <b class="v-decode">—</b></span><span>Private peak <b class="v-mem">—</b></span></div>
         <div class="answer-text"><span class="placeholder">Not run yet.</span></div>
       </div>
