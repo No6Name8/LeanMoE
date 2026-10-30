@@ -11,6 +11,7 @@ Stop it with Ctrl+C. It never downloads model files.
 from __future__ import annotations
 
 import sys
+import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -27,16 +28,32 @@ def main() -> int:
     ap.add_argument("--open", action="store_true", help="open the dashboard in the default browser")
     ap.add_argument("--execution-location", choices=("local", "server"), default="local",
                     help="label the backend explicitly; server is for a forwarded/server session (binding stays localhost)")
+    ap.add_argument("--public-origin", help="protected HTTPS origin behind the local proxy; requires proxy secret and visitor accounts in environment")
     args = ap.parse_args()
 
     from src.dashboard.server import DEFAULT_PORT, HOST, serve
 
+    access = None
+    if args.public_origin:
+        from src.dashboard.access import ProxyAccess
+        if args.execution_location != "server":
+            ap.error("--public-origin requires --execution-location server")
+        try:
+            access = ProxyAccess(args.public_origin, os.environ.get("LEANMOE_PROXY_SECRET", ""),
+                                 frozenset(filter(None, os.environ.get("LEANMOE_VISITOR_ACCOUNTS", "").split(","))))
+        except ValueError as e:
+            ap.error(str(e))
     port = DEFAULT_PORT if args.port is None else args.port
     try:
-        server, engine = serve(port, execution_location=args.execution_location)
+        server, engine = serve(port, execution_location=args.execution_location, access=access)
     except OSError as e:
         print(f"Could not listen on {HOST}:{port} ({e}). Another program may be using it; try --port 8771.")
         return 1
+    if access is not None and engine.store_problem:
+        print("Protected deployment refused: real Qwen store is not ready. Check LEANMOE_MODELS_ROOT.")
+        server.server_close()
+        engine.close()
+        return 2
     url = f"http://{HOST}:{server.server_address[1]}/"
     status = engine.status()
     print(f"LeanMoE dashboard: {url}  (this computer only; Ctrl+C to stop)")

@@ -1,0 +1,55 @@
+{
+  "checks": [
+    "anonymous HTTPS rejected",
+    "origin, token, budget, real-store-only and admission limits",
+    "cross-account and same-account browser isolation; busy; owner status",
+    "real SSE, owner budget change/cancellation and model cleanup",
+    "real sequential comparison; identical two-token prefix; final idle"
+  ],
+  "build": null,
+  "cancelled_run": {
+    "stop_reason": "cancelled",
+    "output_tokens": 1,
+    "load_seconds": 5.404981400000906,
+    "time_to_first_token_s": 43.32935219999854,
+    "decode_tokens_per_s": null
+  },
+  "comparison": {
+    "type": "compare_done",
+    "completed_runs": [
+      "cached",
+      "mmap"
+    ],
+    "token_ids_identical": true,
+    "runs": [
+      {
+        "mode": "cached",
+        "stop_reason": "limit",
+        "output_tokens": 2,
+        "time_to_first_token_s": 43.27122319999944,
+        "decode_tokens_per_s": 0.1708102704594559,
+        "load_seconds": 3.1364648999988276,
+        "memory": {
+          "peak_private_gb": 3.231932416,
+          "peak_working_set_gb": 2.939920384,
+          "samples": 450,
+          "interval_s": 0.1
+        }
+      },
+      {
+        "mode": "mmap",
+        "stop_reason": "limit",
+        "output_tokens": 2,
+        "time_to_first_token_s": 85.66760009999962,
+        "decode_tokens_per_s": 1.7505666584290671,
+        "load_seconds": 2.164178200000606,
+        "memory": {
+          "peak_private_gb": 0.495218688,
+          "peak_working_set_gb": 12.400951296,
+          "samples": 788,
+          "interval_s": 0.1
+        }
+      }
+    ]
+  }
+}

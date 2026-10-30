@@ -1,0 +1,75 @@
+{
+  "model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+  "revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+  "durable_and_fast_manifest_verified": true,
+  "binary_matches_laptop_manifest": {
+    "experts.bin": true,
+    "resident.bin": true
+  },
+  "vm_files": [
+    {
+      "name": "store.json",
+      "bytes": 4041,
+      "sha256": "634599ecd3d3c5e18ce285e400d0e0ffb0b67b71183ee59a1cba288a1a692c46"
+    },
+    {
+      "name": "experts.bin",
+      "bytes": 12486574080,
+      "sha256": "4806511444692e27302ebc35af9c08972bb1207eacbb9ac94f7b79d5fae9ce03"
+    },
+    {
+      "name": "resident.bin",
+      "bytes": 1871822848,
+      "sha256": "dbd1f55d61cd2d622a823f6e607b90d03ea50b1d1e417311b793f1da6acba2ed"
+    },
+    {
+      "name": "experts_index.json",
+      "bytes": 1250087,
+      "sha256": "a6606e614878bf66ca657237b2199e8e79c02de7e2014a18b3b303f7c3621b55"
+    },
+    {
+      "name": "resident_index.json",
+      "bytes": 142417,
+      "sha256": "e581b1d3feb2cd13b0fe2219c2ba47257f5f9d9aeee58138c0164ed5ffa05eba"
+    },
+    {
+      "name": "tokenizer.json",
+      "bytes": 7028015,
+      "sha256": "f7c9b2dba4a296b1aa76c16a34b8225c0c118978400d4bb66bff0902d702f5b8"
+    },
+    {
+      "name": "tokenizer_config.json",
+      "bytes": 1289,
+      "sha256": "3ec7934124b5e81aaa9c0977b95299b8ca3911b91bf8114494023fbbb22a515f"
+    },
+    {
+      "name": "LICENSE",
+      "bytes": 6897,
+      "sha256": "6e521a32ba6661de2b3e7b1cd27d7e1e9b8ff99633c79462a23284cac13c8b8d"
+    },
+    {
+      "name": "NOTICE",
+      "bytes": 335,
+      "sha256": "e94ad4dbddfb057a36ddb01258b05a7aea39dc3289f013a0a1bd598c01d779bf"
+    },
+    {
+      "name": "CHANGES",
+      "bytes": 532,
+      "sha256": "623457b1e139dcc6fa64239adfb845bb26a4daee1ec2202a88d8f050e07a2986"
+    },
+    {
+      "name": "provenance.json",
+      "bytes": 320,
+      "sha256": "c40bcad090bef7039abc5a634c4d84f654d214c0a99e7407c812d6490bbc900b"
+    }
+  ],
+  "note": "VM hashes reverified against VM manifest; laptop comparison uses existing laptop manifest, without rehashing laptop binaries.",
+  "index_entry_differences": {
+    "resident_index.json": [
+      "quant_error"
+    ],
+    "experts_index.json": [
+      "quant_error"
+    ]
+  }
+}

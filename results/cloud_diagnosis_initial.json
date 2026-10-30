@@ -1,0 +1,377 @@
+{
+  "purpose": "bounded cloud diagnosis; not a benchmark or speedup claim",
+  "prompt": "What is 2 + 2? Give a short answer.",
+  "max_new_tokens": 4,
+  "max_seq": 512,
+  "budget_gb": 3.5,
+  "starting_cache_gb": 1.2,
+  "execution_location": "server",
+  "store_drive": "D:",
+  "started_utc": "2026-10-30T15:06:00Z",
+  "jit_definition": "time inside Numba Dispatcher.compile, including cached specialization loading; overlaps phase wall time",
+  "disk_definition": "system-wide Windows disk counters, including unrelated processes; not isolated device throughput",
+  "runs": [
+    {
+      "mode": "cached",
+      "fresh_process": true,
+      "import_seconds": 2.165444500000376,
+      "load": {
+        "wall_s": 6.872748499999943,
+        "process_cpu_s": 1.453125,
+        "cpu_percent_of_all_vcpus": 5.285821967732458,
+        "process_read_bytes": 1564392395,
+        "system_disk_deltas": {
+          "PhysicalDrive0": {
+            "read_bytes": 29645824,
+            "read_count": 1590,
+            "read_time_ms": 1
+          },
+          "PhysicalDrive1": {
+            "read_bytes": 12398592,
+            "read_count": 208,
+            "read_time_ms": 0
+          }
+        }
+      },
+      "threads": {
+        "openblas": 4,
+        "numba": 4
+      },
+      "runs": [
+        {
+          "engine_state": "fresh model",
+          "os_file_cache": "uncontrolled; no flush; prior reads and manifest verification can warm it",
+          "prefill_s": 44.345998699998745,
+          "decode_tokens_s": 0.24280807932227919,
+          "token_ids": [
+            17,
+            488,
+            220,
+            17
+          ],
+          "steps": [
+            {
+              "seconds": 44.345998699998745,
+              "stats": {
+                "expert_loads": 1229,
+                "demand_reads": 43,
+                "cache_hits": 0,
+                "prefetch_hits": 513,
+                "prefetch_waits": 673,
+                "expert_read_seconds": 34.37328439998964
+              }
+            },
+            {
+              "seconds": 6.013480400000844,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 43,
+                "cache_hits": 0,
+                "prefetch_hits": 31,
+                "prefetch_waits": 22,
+                "expert_read_seconds": 5.6993338000029325
+              }
+            },
+            {
+              "seconds": 3.3469862999991165,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 70,
+                "cache_hits": 5,
+                "prefetch_hits": 21,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 2.9830419000081747
+              }
+            },
+            {
+              "seconds": 2.99497060000067,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 63,
+                "cache_hits": 14,
+                "prefetch_hits": 19,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 2.6980511999954615
+              }
+            }
+          ],
+          "stop_reason": "limit",
+          "jit_dispatch_seconds": 2.7989971000006335,
+          "wall_s": 56.70473209999909,
+          "process_cpu_s": 161.125,
+          "cpu_percent_of_all_vcpus": 71.0368403274771,
+          "process_read_bytes": 13729355831,
+          "system_disk_deltas": {
+            "PhysicalDrive0": {
+              "read_bytes": 38752256,
+              "read_count": 1407,
+              "read_time_ms": 3
+            },
+            "PhysicalDrive1": {
+              "read_bytes": 13732397056,
+              "read_count": 1680,
+              "read_time_ms": 115
+            }
+          }
+        },
+        {
+          "engine_state": "warm engine, retained expert cache",
+          "os_file_cache": "uncontrolled; no flush; prior reads and manifest verification can warm it",
+          "prefill_s": 43.23752609999974,
+          "decode_tokens_s": 0.31201821462484103,
+          "token_ids": [
+            17,
+            488,
+            220,
+            17
+          ],
+          "steps": [
+            {
+              "seconds": 43.23752609999974,
+              "stats": {
+                "expert_loads": 1229,
+                "demand_reads": 49,
+                "cache_hits": 1,
+                "prefetch_hits": 429,
+                "prefetch_waits": 750,
+                "expert_read_seconds": 36.178878099999565
+              }
+            },
+            {
+              "seconds": 3.2628008000010595,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 70,
+                "cache_hits": 4,
+                "prefetch_hits": 22,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 2.9674467999939225
+              }
+            },
+            {
+              "seconds": 3.304579499999818,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 72,
+                "cache_hits": 5,
+                "prefetch_hits": 19,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 3.006969099998969
+              }
+            },
+            {
+              "seconds": 3.0474430000012944,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 63,
+                "cache_hits": 14,
+                "prefetch_hits": 19,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 2.7506519999915326
+              }
+            }
+          ],
+          "stop_reason": "limit",
+          "jit_dispatch_seconds": 0,
+          "wall_s": 52.8556482999993,
+          "process_cpu_s": 158.46875,
+          "cpu_percent_of_all_vcpus": 74.95355515297032,
+          "process_read_bytes": 13032861696,
+          "system_disk_deltas": {
+            "PhysicalDrive0": {
+              "read_bytes": 352256,
+              "read_count": 12,
+              "read_time_ms": 0
+            },
+            "PhysicalDrive1": {
+              "read_bytes": 13032898560,
+              "read_count": 1504,
+              "read_time_ms": 102
+            }
+          }
+        }
+      ]
+    },
+    {
+      "mode": "mmap",
+      "fresh_process": true,
+      "import_seconds": 1.0520601000007446,
+      "load": {
+        "wall_s": 2.023668499999985,
+        "process_cpu_s": 0.046875,
+        "cpu_percent_of_all_vcpus": 0.5790844696154576,
+        "process_read_bytes": 1548579,
+        "system_disk_deltas": {
+          "PhysicalDrive0": {
+            "read_bytes": 171520,
+            "read_count": 4,
+            "read_time_ms": 0
+          },
+          "PhysicalDrive1": {
+            "read_bytes": 0,
+            "read_count": 0,
+            "read_time_ms": 0
+          }
+        }
+      },
+      "threads": {
+        "openblas": 4,
+        "numba": 4
+      },
+      "runs": [
+        {
+          "engine_state": "fresh model",
+          "os_file_cache": "uncontrolled; no flush; prior reads and manifest verification can warm it",
+          "prefill_s": 49.9155068,
+          "decode_tokens_s": 1.9880133398321005,
+          "token_ids": [
+            17,
+            488,
+            220,
+            17
+          ],
+          "steps": [
+            {
+              "seconds": 49.9155068,
+              "stats": {
+                "expert_loads": 1229,
+                "demand_reads": 0,
+                "cache_hits": 0,
+                "prefetch_hits": 0,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 0.0
+              }
+            },
+            {
+              "seconds": 0.35870920000161277,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 0,
+                "cache_hits": 0,
+                "prefetch_hits": 0,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 0.0
+              }
+            },
+            {
+              "seconds": 0.4065704000004189,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 0,
+                "cache_hits": 0,
+                "prefetch_hits": 0,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 0.0
+              }
+            },
+            {
+              "seconds": 0.7437645999998495,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 0,
+                "cache_hits": 0,
+                "prefetch_hits": 0,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 0.0
+              }
+            }
+          ],
+          "stop_reason": "limit",
+          "jit_dispatch_seconds": 1.3116276000000653,
+          "wall_s": 51.42801630000031,
+          "process_cpu_s": 70.65625,
+          "cpu_percent_of_all_vcpus": 34.3471589434024,
+          "process_read_bytes": 2845445,
+          "system_disk_deltas": {
+            "PhysicalDrive0": {
+              "read_bytes": 12744704,
+              "read_count": 606,
+              "read_time_ms": 1
+            },
+            "PhysicalDrive1": {
+              "read_bytes": 10937569280,
+              "read_count": 309918,
+              "read_time_ms": 123
+            }
+          }
+        },
+        {
+          "engine_state": "warm engine, retained expert cache",
+          "os_file_cache": "uncontrolled; no flush; prior reads and manifest verification can warm it",
+          "prefill_s": 6.627893000000768,
+          "decode_tokens_s": 4.017729974526728,
+          "token_ids": [
+            17,
+            488,
+            220,
+            17
+          ],
+          "steps": [
+            {
+              "seconds": 6.627893000000768,
+              "stats": {
+                "expert_loads": 1229,
+                "demand_reads": 0,
+                "cache_hits": 0,
+                "prefetch_hits": 0,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 0.0
+              }
+            },
+            {
+              "seconds": 0.2500271999997494,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 0,
+                "cache_hits": 0,
+                "prefetch_hits": 0,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 0.0
+              }
+            },
+            {
+              "seconds": 0.24876529999892227,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 0,
+                "cache_hits": 0,
+                "prefetch_hits": 0,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 0.0
+              }
+            },
+            {
+              "seconds": 0.24789780000173778,
+              "stats": {
+                "expert_loads": 96,
+                "demand_reads": 0,
+                "cache_hits": 0,
+                "prefetch_hits": 0,
+                "prefetch_waits": 0,
+                "expert_read_seconds": 0.0
+              }
+            }
+          ],
+          "stop_reason": "limit",
+          "jit_dispatch_seconds": 0,
+          "wall_s": 7.377920000000813,
+          "process_cpu_s": 28.125,
+          "cpu_percent_of_all_vcpus": 95.30125021685278,
+          "process_read_bytes": 0,
+          "system_disk_deltas": {
+            "PhysicalDrive0": {
+              "read_bytes": 2271744,
+              "read_count": 131,
+              "read_time_ms": 0
+            },
+            "PhysicalDrive1": {
+              "read_bytes": 2400256,
+              "read_count": 41,
+              "read_time_ms": 0
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -19,7 +19,7 @@
     const stale = seconds === null || seconds >= 15;
     const age = seconds === null ? "Update time unavailable" : seconds < 5 ? "Updated just now" :
       `Updated ${seconds < 60 ? `${seconds}s` : seconds < 3600 ? `${Math.floor(seconds / 60)}m` : `${Math.floor(seconds / 3600)}h`} ago`;
-    let state = !status ? "unavailable" : !status.busy ? "Idle" : status.active?.phase === "loading" ? "Loading" : "Running";
+    let state = !status ? "unavailable" : !status.busy ? "Idle" : !status.active ? "Busy with another visitor" : status.active?.phase === "loading" ? "Loading" : "Running";
     if (m.loaded_model && m.loaded_model !== "none") state += ` - ${m.loaded_model} / ${mode(m.execution_mode)}`;
     else if (status?.busy && status.active) state += ` - ${{real: "Qwen", synthetic: "Engine test"}[status.active.source] || "unavailable"} / ${mode(status.active.mode)}`;
     if (disconnected || stale) state = `${disconnected ? "Disconnected" : "Stale"} - last known: ${state}`;

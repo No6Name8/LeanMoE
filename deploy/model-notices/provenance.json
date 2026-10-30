@@ -1,0 +1,6 @@
+{
+  "model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+  "revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+  "license_source": "https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B-Chat/resolve/ec052fda178e241c7c443468d2fa1db6618996be/LICENSE",
+  "sha256": "6e521a32ba6661de2b3e7b1cd27d7e1e9b8ff99633c79462a23284cac13c8b8d"
+}

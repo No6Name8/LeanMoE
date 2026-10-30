@@ -76,9 +76,10 @@
   document.addEventListener("click", (e) => { if (sysDetails.open && !sysDetails.contains(e.target)) sysDetails.open = false; });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") sysDetails.open = false; });
 
-  const tabs = ["run", "compare", "evidence"];
+  const tabs = ["run", "compare", "evidence", "cloud"];
   function showTab(name) {
     sysDetails.open = false;
+    $("settings").hidden = name === "cloud";
     for (const t of tabs) {
       const on = t === name;
       $("tab-" + t).setAttribute("aria-selected", String(on));
@@ -137,8 +138,8 @@
   function refreshButtons() {
     const runBlocked = ui.qwenMissing && pick.source === "real";
     const cmpBlocked = ui.qwenMissing && pick["cmp-source"] === "real";
-    $("run").disabled = ui.busy || runBlocked;
-    $("compare").disabled = ui.busy || cmpBlocked;
+    $("run").disabled = ui.busy || ui.otherVisitorBusy || runBlocked;
+    $("compare").disabled = ui.busy || ui.otherVisitorBusy || cmpBlocked;
   }
 
   for (const p of ["run", "cmp"]) {
@@ -184,6 +185,17 @@
       renderSystem(); return;
     } finally { clearTimeout(timeout); statusPending = false; }
     ui.status = s;
+    $("cloud-location").textContent = s.system?.execution_location === "server" ?
+      "You are using the cloud server. Prompts run on the server, not on your computer." :
+      "Opening the cloud demo moves execution to the server. It does not run cloud inference on your computer.";
+    $("cloud-version").textContent = s.build?.commit ? `Backend version: ${s.build.commit.slice(0, 12)}` : "Backend version unavailable";
+    const protectedSite = Boolean(s.access?.protected);
+    ui.otherVisitorBusy = protectedSite && s.busy && !s.active;
+    $("engine-availability").hidden = !protectedSite;
+    $("engine-availability").textContent = ui.otherVisitorBusy ? "Engine busy with another visitor. No queue; retry when it is available." :
+      "Protected cloud session. One active job; no queue. Up to 96 output tokens per mode and 10 minutes per job. Memory budget is a process planning target, not a limit on Windows file cache or VM RAM.";
+    $("max-new").max = s.limits.max_new_tokens;
+    for (const prefix of ["run", "cmp"]) $(prefix + "-advanced").hidden = protectedSite;
     const ok = s.real_store.available;
     $("store-pill").textContent = ok ? "Qwen ready" : "Qwen store not found";
     $("store-pill").className = "pill " + (ok ? "ok" : "no");

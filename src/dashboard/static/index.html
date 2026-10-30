@@ -34,9 +34,11 @@
   <button role="tab" id="tab-run" aria-controls="panel-run" aria-selected="true">Run</button>
   <button role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false" tabindex="-1">Compare</button>
   <button role="tab" id="tab-evidence" aria-controls="panel-evidence" aria-selected="false" tabindex="-1">Evidence</button>
+  <button role="tab" id="tab-cloud" aria-controls="panel-cloud" aria-selected="false" tabindex="-1">Cloud</button>
 </nav>
 
 <main>
+  <p id="engine-availability" class="hint" role="status" hidden></p>
   <details class="details settings" id="settings">
     <summary>Settings</summary>
     <div class="settings-grid">
@@ -234,6 +236,20 @@
       <pre>powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1
 .\.venv\Scripts\python.exe -m pytest</pre>
     </details>
+  </section>
+  <section id="panel-cloud" role="tabpanel" aria-labelledby="tab-cloud" class="tabpanel" hidden>
+    <div class="card">
+      <h2>LeanMoE in your browser</h2>
+      <p>The same LeanMoE engine and Qwen store run on a Windows cloud server. Enter a prompt, compare LeanMoE with Windows paging on that server, and inspect real measurements.</p>
+      <p id="cloud-location" class="hint">Opening the cloud demo moves execution to the server. It does not run cloud inference on your computer.</p>
+      <p><a class="primary cloud-link" href="https://leanmoe-demo-1.eastus.cloudapp.azure.com/" target="_blank" rel="noopener noreferrer">Open cloud demo</a></p>
+      <p class="hint">Credentials are required; request them from the operator. One active job, no queue. Cloud speedup is not established. Recorded laptop evidence remains separate from live server results.</p>
+      <details class="details compact"><summary>Download and run locally</summary>
+        <p><a href="https://github.com/No6Name8/LeanMoE#readme" target="_blank" rel="noopener noreferrer">Source and Windows setup instructions</a> · <a href="https://github.com/No6Name8/LeanMoE/blob/main/deploy/README.md" target="_blank" rel="noopener noreferrer">Deployment, recovery and shutdown</a></p>
+        <p class="hint">Local use requires the model store to be downloaded or built and its location configured. Model weights are not included in the repository.</p>
+      </details>
+      <p id="cloud-version" class="hint"></p>
+    </div>
   </section>
 </main>
 

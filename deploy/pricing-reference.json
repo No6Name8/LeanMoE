@@ -1,0 +1,39 @@
+{
+  "observed_at_utc": "2026-10-30T15:07:00+00:00",
+  "currency": "USD",
+  "source": "Azure Retail Prices API (https://prices.azure.com/api/retail/prices), list prices, region eastus, priceType Consumption",
+  "billing_hours_per_month_assumed": 730,
+  "vm": {
+    "armSkuName": "Standard_D4ds_v4",
+    "productName": "Virtual Machines Ddsv4 Series Windows",
+    "retailPrice": 0.41,
+    "unitOfMeasure": "1 Hour",
+    "note": "Windows license included; actual deployed SKU. List rate, not an invoice."
+  },
+  "os_disk": {
+    "skuName": "P10 LRS",
+    "productName": "Premium SSD Managed Disks",
+    "meterName": "P10 LRS Disk",
+    "retailPrice": 19.71,
+    "unitOfMeasure": "1/Month",
+    "note": "128 GB Premium SSD; billed hourly, prorated"
+  },
+  "public_ip": {
+    "skuName": "Standard",
+    "productName": "IP Addresses",
+    "meterName": "Standard IPv4 Static Public IP",
+    "retailPrice": 0.005,
+    "unitOfMeasure": "1 Hour"
+  },
+  "outbound_data_usd_per_gb_assumed": 0.087,
+  "outbound_data_note": "conservative placeholder from the earlier estimate, not re-fetched; inbound data (uploading the model store) is not charged",
+  "free_account": {
+    "credit": "USD 200 (in the billing currency) for the first 30 days, eligible new customers only",
+    "sources": [
+      "https://azure.microsoft.com/en-us/pricing/offers/ms-azr-0044p",
+      "https://learn.microsoft.com/en-us/azure/cost-management-billing/manage/avoid-charges-free-account"
+    ],
+    "spending_limit": "on by default and equal to the credit; when credit runs out or expires the subscription is disabled unless upgraded",
+    "card": "credit or non-prepaid debit card required; temporary authorization hold only"
+  }
+}

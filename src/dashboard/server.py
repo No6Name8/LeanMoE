@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import gc
 import json
+import os
 import queue
 import re
 import tempfile
@@ -37,7 +38,8 @@ from src.engine import REPO_ROOT
 from src.engine.benchmarking import openblas_threads, process_private_bytes
 from src.engine.cache.expert_cache import CachedExpertSource
 from src.engine.paths import MODELS_ROOT
-from src.dashboard.evidence import recorded_evidence
+from src.dashboard.evidence import recorded_evidence, ARTIFACT_LABELS
+from src.dashboard.access import ProxyAccess
 from src.dashboard.system import snapshot, optional
 
 HOST = "127.0.0.1"
@@ -97,6 +99,9 @@ class Request:
     kind: str  # "generate" or "compare"
     source: str
     mode: str
+    owner: str | None = None
+    deadline: object = None
+    watchdog: object = None
     cancel: object = None  # CancelToken
     live: object = None  # LiveBudget, real cached runs only
     phase: str = "loading"
@@ -249,12 +254,12 @@ class Engine:
 
     # ------------------------------------------------------------ requests (handler threads)
 
-    def try_begin(self, kind: str, params: dict) -> Request | None:
+    def try_begin(self, kind: str, params: dict, owner: str | None = None) -> Request | None:
         if not self.busy.acquire(blocking=False):
             return None
         from src.engine.runtime.streaming import CancelToken
 
-        req = Request(id=uuid.uuid4().hex, kind=kind, source=params["source"], mode=params["mode"], cancel=CancelToken())
+        req = Request(id=uuid.uuid4().hex, kind=kind, source=params["source"], mode=params["mode"], owner=owner, cancel=CancelToken())
         self.active = req
         return req
 
@@ -301,6 +306,11 @@ class Engine:
                 out.put({"type": "error", "message": f"{type(e).__name__}: {e}"})
                 self.unload()
             finally:
+                for timer in (req.deadline, req.watchdog):
+                    if timer is not None:
+                        timer.cancel()
+                if req.owner is not None:
+                    self.unload()  # no warm cache or request resources reused across public visitors
                 self.active = None
                 out.put(None)
                 self.busy.release()
@@ -454,6 +464,7 @@ class Engine:
         loaded = None if self.loaded_key is None else {"source": self.loaded_key[0], "mode": self.loaded_key[1]}
         system = snapshot(self.execution_location, threads, loaded, req)
         return {
+            "build": {"commit": os.environ.get("LEANMOE_DEPLOYED_COMMIT") if re.fullmatch(r"[0-9a-f]{40}", os.environ.get("LEANMOE_DEPLOYED_COMMIT", "")) else None},
             "system": system,
             "busy": req is not None,
             "active": None if req is None else {"request_id": req.id, "kind": req.kind, "source": req.source,
@@ -471,9 +482,11 @@ class Engine:
         }
 
 
-def make_handler(engine: Engine, port: int):
+def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None):
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
     allowed_origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
+    if access is not None:
+        allowed_origins = {access.origin}
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "LeanMoE"
@@ -481,11 +494,34 @@ def make_handler(engine: Engine, port: int):
         def log_message(self, fmt, *args) -> None:  # keep the console readable
             pass
 
+        def setup(self):
+            super().setup()
+            if access is not None:
+                self.connection.settimeout(15)
+
+        def _identity(self, *, create=False):
+            self.owner = None
+            if access is None:
+                return True
+            try:
+                self.owner, self.session_cookie = access.identify(self.headers, create=create)
+                return True
+            except PermissionError as e:
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": str(e)})
+                return False
+
+        def _owned(self, request_id):
+            req = engine.active
+            if access is not None and (req is None or req.owner != self.owner or req.id != request_id):
+                raise LookupError("no active run owned by this browser session")
+
         def _headers(self, status: int, ctype: str, extra: dict | None = None) -> None:
             self.send_response(status)
             self.send_header("Content-Type", ctype)
             for k, v in {**SECURITY_HEADERS, **(extra or {})}.items():
                 self.send_header(k, v)
+            if getattr(self, "session_cookie", None):
+                self.send_header("Set-Cookie", self.session_cookie)
             self.end_headers()
 
         def _json(self, status: int, payload: dict) -> None:
@@ -502,15 +538,30 @@ def make_handler(engine: Engine, port: int):
         def do_GET(self) -> None:  # noqa: N802
             if not self._host_ok():
                 return
+            if not self._identity(create=True):
+                return
             path = self.path.split("?", 1)[0]
             if path == "/api/status":
-                return self._json(HTTPStatus.OK, engine.status())
+                status = engine.status()
+                if access is not None:
+                    status["access"] = {"protected": True, "queue": "none", "max_seconds": access.max_seconds}
+                    status["limits"]["max_new_tokens"] = access.max_tokens
+                    req = engine.active
+                    owns_snapshot = (req is not None and req.owner == self.owner and status["active"] is not None
+                                     and status["active"]["request_id"] == req.id)
+                    if not owns_snapshot:
+                        status["active"] = None
+                        status["loaded"] = None
+                        status["system"].update(loaded_model="unavailable" if status["busy"] else "none", execution_mode=None, active_mode=None)
+                return self._json(HTTPStatus.OK, status)
             if path == "/":
                 return self._file(STATIC_DIR / "index.html")
             if path.startswith("/static/"):
                 return self._file(STATIC_DIR / path[len("/static/"):], root=STATIC_DIR)
             m = re.fullmatch(r"/evidence/([A-Za-z0-9_.-]+\.(?:json|md))", path)
             if m:
+                if access is not None and m.group(1) not in {*ARTIFACT_LABELS, "EVIDENCE.md"}:
+                    return self._json(HTTPStatus.NOT_FOUND, {"error": "not a published evidence artifact"})
                 return self._file(RESULTS_DIR / m.group(1), root=RESULTS_DIR)
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -533,13 +584,15 @@ def make_handler(engine: Engine, port: int):
                 length = int(self.headers.get("Content-Length") or 0)
             except ValueError:
                 length = -1
-            if not 0 <= length <= 64_000:
+            if self.headers.get("Transfer-Encoding") or not 0 <= length <= (16_000 if access else 64_000):
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": "missing or too large request body"})
             raw = self.rfile.read(length)
             if not self._host_ok():
                 return
+            if not self._identity():
+                return
             origin = self.headers.get("Origin")
-            if origin is not None and origin not in allowed_origins:
+            if (access is not None and origin != access.origin) or (origin is not None and origin not in allowed_origins):
                 return self._json(HTTPStatus.FORBIDDEN, {"error": "cross-origin requests are not accepted"})
             if not (self.headers.get("Content-Type") or "").startswith("application/json"):
                 return self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "send JSON (Content-Type: application/json)"})
@@ -554,8 +607,12 @@ def make_handler(engine: Engine, port: int):
                 if path in ("/api/generate", "/api/compare"):
                     return self._run(body, compare=path == "/api/compare")
                 if path == "/api/cancel":
+                    self._owned(str(body.get("request_id", "")))
                     return self._json(HTTPStatus.OK, engine.cancel(str(body.get("request_id", ""))))
                 if path == "/api/budget":
+                    self._owned(str(body.get("request_id", "")))
+                    if access and (not isinstance(body.get("budget_gb"), (int, float)) or not 0.5 <= body["budget_gb"] <= access.max_budget_gb):
+                        raise BadRequest("public budget must be between 0.5 and 4 GB (planning target only)")
                     return self._json(HTTPStatus.OK, engine.set_budget(str(body.get("request_id", "")), body.get("budget_gb")))
             except LookupError as e:
                 return self._json(HTTPStatus.CONFLICT, {"error": str(e)})
@@ -564,16 +621,34 @@ def make_handler(engine: Engine, port: int):
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         def _run(self, body: dict, *, compare: bool) -> None:
+            if access is not None:
+                if engine.active is not None:
+                    return self._json(HTTPStatus.CONFLICT, {"error": "Engine busy. No queue; retry after the current run finishes."})
+                if not access.admit(self.headers["X-LeanMoE-Visitor"]):
+                    return self._json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Three runs per minute per visitor; retry shortly."})
+                if body.get("source", "real") != "real":
+                    return self._json(HTTPStatus.BAD_REQUEST, {"error": "public runs use the real Qwen store only"})
             try:
                 params = engine.validate(body, compare=compare)
             except BadRequest as e:
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": str(e)})
-            req = engine.try_begin("compare" if compare else "generate", params)
+            if access and (params["max_new_tokens"] > access.max_tokens or params["budget_gb"] > access.max_budget_gb or params["start_cache_gb"] > 1.3):
+                return self._json(HTTPStatus.BAD_REQUEST, {"error": "public limits: 96 output tokens per mode, 4 GB budget, 1.3 GB starting cache"})
+            req = engine.try_begin("compare" if compare else "generate", params, owner=self.owner)
             if req is None:
                 active = engine.active
                 return self._json(HTTPStatus.CONFLICT, {"error": "another run is in progress; wait for it or cancel it",
-                                                        "active_request_id": active.id if active else None})  # fmt: skip
+                                                        "active_request_id": active.id if active and access is None else None})  # fmt: skip
             out: queue.Queue = queue.Queue()
+            if access:
+                req.deadline = threading.Timer(access.max_seconds, req.cancel.cancel)
+                def hard_stop():
+                    if engine.active is req:
+                        os._exit(70)  # bounded public job; the supervised backend process restarts
+                req.watchdog = threading.Timer(access.max_seconds + 60, hard_stop)
+                for timer in (req.deadline, req.watchdog):
+                    timer.daemon = True
+                    timer.start()
             engine.submit(req, params, out)
             self._headers(HTTPStatus.OK, "text/event-stream; charset=utf-8", {"X-Accel-Buffering": "no"})
             connected = True
@@ -598,6 +673,10 @@ def make_handler(engine: Engine, port: int):
                     continue
                 if item is None:
                     break
+                if access and (item.get("type") == "error" or item.get("error")):
+                    item = {**item, "error": "Engine run failed; ask the operator to check private logs."}
+                    if item.get("type") == "error":
+                        item["message"] = item["error"]
                 send("data: " + json.dumps(item) + "\n\n")
 
     return Handler
@@ -611,6 +690,29 @@ class LocalServer(ThreadingHTTPServer):
     allow_reuse_address = False
     daemon_threads = True
 
+    connection_slots = None
+
+    def process_request(self, request, client_address):
+        if self.connection_slots is not None and not self.connection_slots.acquire(blocking=False):
+            try:
+                request.sendall(b"HTTP/1.0 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            finally:
+                self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            if self.connection_slots is not None:
+                self.connection_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            if self.connection_slots is not None:
+                self.connection_slots.release()
+
     def server_bind(self) -> None:
         import socket
 
@@ -619,7 +721,7 @@ class LocalServer(ThreadingHTTPServer):
         super().server_bind()
 
 
-def serve(port: int = DEFAULT_PORT, models_root: Path | None = None, *, execution_location: str = "local") -> tuple[ThreadingHTTPServer, Engine]:
+def serve(port: int = DEFAULT_PORT, models_root: Path | None = None, *, execution_location: str = "local", access: ProxyAccess | None = None) -> tuple[ThreadingHTTPServer, Engine]:
     """Bind 127.0.0.1:port (0 = any free port) and return the server and its engine."""
     if port:
         import socket
@@ -630,8 +732,11 @@ def serve(port: int = DEFAULT_PORT, models_root: Path | None = None, *, executio
             probe.settimeout(0.5)
             if probe.connect_ex((HOST, port)) == 0:
                 raise OSError(f"port {port} is already in use by another program")
+    if access is not None and execution_location != "server":
+        raise ValueError("protected deployment requires explicit server execution location")
     engine = Engine(models_root, execution_location)
     server = LocalServer((HOST, port), BaseHTTPRequestHandler)
-    server.RequestHandlerClass = make_handler(engine, server.server_address[1])  # the port actually bound
+    server.RequestHandlerClass = make_handler(engine, server.server_address[1], access)  # the port actually bound
+    server.connection_slots = threading.BoundedSemaphore(16) if access else None
     server.daemon_threads = True
     return server, engine

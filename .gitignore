@@ -28,3 +28,8 @@ results/adaptive_budget.txt
 
 # pytest
 .pytest_cache/
+
+# Deployment credentials, private manifests, and generated infrastructure output
+*.private.json
+*.private.caddy
+deploy/main.json

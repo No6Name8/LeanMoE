@@ -1,0 +1,4 @@
+Tongyi Qianwen is licensed under the Tongyi Qianwen LICENSE AGREEMENT, Copyright (c) Alibaba Cloud. All Rights Reserved.
+
+Inference store conversion and engine: ExpertRelay, existing work by Abdullah Ali Alanazi (2026).
+LeanMoE adds evaluation, integration and dashboard work; see the repository README for prior-work attribution.
