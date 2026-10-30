@@ -109,6 +109,28 @@ def test_binds_localhost_only(server):
     assert server[0].server_address[0] == "127.0.0.1"
 
 
+def test_stream_error_releases_local_model_and_stops_compare(server, monkeypatch):
+    from dataclasses import replace
+    import src.engine.runtime.streaming as streaming
+    original = streaming.stream_generate
+
+    def fail(*args, **kwargs):
+        for event in original(*args, **kwargs):
+            if event.kind == 'done':
+                event = replace(event, error='ResourceUnavailable: measured pressure')
+            yield event
+
+    monkeypatch.setattr(streaming, 'stream_generate', fail)
+    _, events = stream(server, '/api/generate', body(max_new_tokens=1))
+    wait_idle(server[1])
+    assert next(e for e in events if e['type'] == 'done')['error']
+    assert server[1].model is None
+    _, events = stream(server, '/api/compare', body(max_new_tokens=1))
+    compared = next(e for e in events if e['type'] == 'compare_done')
+    assert compared['completed_runs'] == ['cached']
+    assert server[1].model is None
+
+
 def test_status_without_a_real_store(server):
     status, s, r = request(server, "GET", "/api/status")
     assert status == 200 and s["real_store"]["available"] is False

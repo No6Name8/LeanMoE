@@ -42,10 +42,12 @@
   <details class="details settings" id="settings">
     <summary>Settings</summary>
     <div class="settings-grid">
+      <label>Memory profile <select id="memory-profile"><option value="auto">Automatic for this machine</option><option value="manual">Manual settings</option><option value="constrained">Constrained adaptation experiment</option></select></label>
       <label>Max new tokens <input id="max-new" type="number" min="1" max="400" value="64"></label>
       <label>Memory budget (GB) <input id="budget" type="number" min="0.5" step="0.1" value="3.5"></label>
       <label>Starting cache (GB) <input id="start-cache" type="number" min="0.05" step="0.1" value="1.2"></label>
     </div>
+    <p id="profile-help" class="hint">Automatic measures physical RAM and Windows commit headroom at each model load, reserves runtime allocations and safety headroom, then selects the cache. Effective values appear in Run details.</p>
     <p class="hint">Used by Run and Compare. Budget and cache apply to Qwen with LeanMoE. Context limit: prompt + output ≤ <span id="max-seq">512</span> tokens.</p>
   </details>
 
@@ -118,6 +120,7 @@
       <div class="area-rest">
         <div class="card budget-card" id="budget-card" hidden>
           <div class="budget-head"><strong>Memory budget</strong><span class="badge live">Live</span></div>
+          <p class="hint">Apply an explicit constrained budget between tokens. This can shrink an automatic cache for the adaptation experiment; it does not limit Windows file cache.</p>
           <div class="budget-row">
             <input id="live-budget" type="range" min="1.5" max="4.0" step="0.1" value="2.5" aria-label="Memory budget in GB">
             <output id="live-budget-value" for="live-budget">2.5 GB</output>

@@ -151,3 +151,20 @@ def test_deadline_cancels_stream(protected):
     assert not t.is_alive()
     done = next(e for e in events if e["type"] == "done")
     assert done["stop_reason"] == "cancelled" and done["output_tokens"] < 50
+
+
+def test_automatic_headroom_refusal_is_safe_and_releases_public_job(protected, monkeypatch):
+    import src.dashboard.resources as resources
+    engine = protected[1]
+    validate = engine.validate
+    engine.validate = lambda body, compare=False: {**validate(body, compare=compare), 'source': 'real', 'profile': 'auto'}
+    def refuse(*args):
+        raise resources.ResourceUnavailable('Insufficient measured physical RAM; retry.')
+    monkeypatch.setattr(resources, 'load', refuse)
+    t, events = start(protected, session(protected))
+    t.join(15)
+    assert not t.is_alive()
+    error = next(e for e in events if e['type'] == 'error')
+    assert error['resource_error'] and 'Insufficient measured physical RAM' in error['message']
+    assert engine.active is None and engine.model is None
+    assert not engine.busy.locked()

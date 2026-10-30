@@ -98,8 +98,11 @@ Host and a signed Secure/HttpOnly/SameSite browser cookie. Separate browser
 sessions cannot inspect or control each other's request, even with a shared account.
 There is one active job, no queue, three admissions/minute/account, 16 active
 backend connection threads, a 16 KB body cap, 4,000 prompt characters, a 512-token
-context and 96 output tokens/mode. Budgets are process planning targets (maximum
-4 GB), **not** caps on Windows file cache or physical RAM.
+context and 96 output tokens/mode. Automatic allocation uses measured backend RAM
+and commit headroom with a safety reserve. Explicit manual requests retain the
+4 GB budget / 1.3 GB cache admission caps; a visitor cannot supply an automatic
+capacity. Budgets are process planning targets, **not** caps on Windows file cache
+or physical RAM. See [resource policy, raw comparison and reproduction](RESOURCE_PROFILE.md).
 
 Cancellation is checked between forward passes. A ten-minute whole-job timer
 requests cancellation; a stuck job exits the backend after eleven minutes so the

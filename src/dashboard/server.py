@@ -41,6 +41,7 @@ from src.engine.paths import MODELS_ROOT
 from src.dashboard.evidence import recorded_evidence, ARTIFACT_LABELS
 from src.dashboard.access import ProxyAccess
 from src.dashboard.system import snapshot, optional
+from src.dashboard.resources import ResourceUnavailable
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8770
@@ -90,7 +91,8 @@ def _numba_threads() -> int | None:
 
 def process_memory() -> dict:
     info = psutil.Process().memory_info()
-    return {"private_gb": process_private_bytes() / GB, "working_set_gb": info.rss / GB}
+    return {"private_gb": process_private_bytes() / GB, "working_set_gb": info.rss / GB,
+            'system_available_gb': psutil.virtual_memory().available / GB}
 
 
 @dataclass
@@ -117,12 +119,14 @@ class Sampler(threading.Thread):
         self.peak_private = 0.0
         self.peak_ws = 0.0
         self.samples = 0
+        self.min_available = float('inf')
 
     def run(self) -> None:
         while not self._stop.is_set():
             m = process_memory()
             self.peak_private = max(self.peak_private, m["private_gb"])
             self.peak_ws = max(self.peak_ws, m["working_set_gb"])
+            self.min_available = min(self.min_available, m['system_available_gb'])
             self.samples += 1
             self._stop.wait(SAMPLE_SECONDS)
 
@@ -130,6 +134,7 @@ class Sampler(threading.Thread):
         self._stop.set()
         self.join()
         return {"peak_private_gb": self.peak_private, "peak_working_set_gb": self.peak_ws,
+                'min_system_available_gb': self.min_available if self.samples else None,
                 "samples": self.samples, "interval_s": SAMPLE_SECONDS}  # fmt: skip
 
 
@@ -232,6 +237,11 @@ class Engine:
         total_ram = psutil.virtual_memory().total / GB
         budget = number("budget_gb", DEFAULT_BUDGET_GB, 0.5, round(total_ram, 2))
         start_cache = number("start_cache_gb", DEFAULT_START_CACHE_GB, 0.05, 8.0)
+        profile = body.get('profile', 'manual' if source == 'synthetic' or 'budget_gb' in body or 'start_cache_gb' in body else 'auto')
+        if profile not in ('auto', 'manual', 'constrained'):
+            raise BadRequest('profile must be auto, manual or constrained')
+        if source == 'synthetic':
+            profile = 'manual'
         ids = self.prompt_ids(source, prompt)
         try:
             check_context(len(ids), max_new, MAX_SEQ)
@@ -244,13 +254,13 @@ class Engine:
             for m in (MODES if compare else (mode,)):
                 est = estimate_ram_bytes(self.store_dir, cfg, MAX_SEQ, m, "numpy",
                                          start_cache if m == "cached" else 0.0, "fused") / GB  # fmt: skip
-                if est > budget:
+                if profile != 'auto' and est > budget:
                     raise BadRequest(
                         f"{m} mode would need an estimated {est:.2f} GB, over the {budget:.2f} GB budget; "
                         "lower the starting cache or raise the budget"
                     )
         return {"prompt": prompt, "ids": ids, "source": source, "mode": mode, "max_new_tokens": max_new,
-                "budget_gb": budget, "start_cache_gb": start_cache}  # fmt: skip
+                "budget_gb": budget, "start_cache_gb": start_cache, 'profile': profile}  # fmt: skip
 
     # ------------------------------------------------------------ requests (handler threads)
 
@@ -301,9 +311,12 @@ class Engine:
                 if req.kind == "compare":
                     self._compare(req, params, out)
                 else:
-                    self._generate(req, params, out, reuse=True)
+                    result = self._generate(req, params, out, reuse=True)
+                    if result.get("error"):
+                        self.unload()
             except Exception as e:  # noqa: BLE001 - reported to the page, then state is cleaned up
-                out.put({"type": "error", "message": f"{type(e).__name__}: {e}"})
+                out.put({"type": "error", "message": str(e) if isinstance(e, ResourceUnavailable) else f"{type(e).__name__}: {e}",
+                         'resource_error': isinstance(e, ResourceUnavailable)})
                 self.unload()
             finally:
                 for timer in (req.deadline, req.watchdog):
@@ -323,24 +336,40 @@ class Engine:
         self.start_cache_bytes = None
         gc.collect()  # releases memory-mapped weight files before anything else loads
 
-    def _load(self, source: str, mode: str, start_cache_gb: float, budget_gb: float) -> dict:
-        key = (source, mode, round(start_cache_gb, 4))
-        if self.model is not None and self.loaded_key == key:
-            return {"reused": True, "load_seconds": 0.0}  # nothing loaded for this run
+    def _load(self, source: str, mode: str, start_cache_gb: float, budget_gb: float, profile='manual') -> dict:
+        key = (source, mode, round(start_cache_gb, 4), profile)
+        if self.model is not None and self.loaded_key == key and profile != 'auto':
+            if source == 'real':
+                from dataclasses import asdict
+                from src.dashboard.resources import components, measure, require, reserve
+                rt = replace(self.rt, max_seq=MAX_SEQ, int8_kernel='fused')
+                m = measure()
+                require(m)
+                growth = max(0, (self.start_cache_bytes or 0) - getattr(self.model.experts, 'capacity_bytes', 0))
+                # Existing resident/cache pages already reduce available RAM.
+                # Reserve only future context/scratch and any reset-cache growth.
+                if min(m.available, m.commit_available) >= reserve(m.total) + components(self.store_dir, rt)['transient'] + growth:
+                    details = {**self.load_info, 'reused': True, 'load_seconds': 0.0}
+                    details['profile'] = {**details['profile'], 'budget_gb': budget_gb,
+                                          'reuse_measurements': asdict(m)}
+                    return details
+            else:
+                return {**self.load_info, "reused": True, "load_seconds": 0.0}
         self.unload()
         t = time.perf_counter()
         if source == "real":
-            from src.engine.runtime.generate import load_model
+            from src.dashboard.resources import load
 
             rt = replace(self.rt, expert_cache_gb=start_cache_gb, prefetch=True, int8_kernel="fused",
                          max_seq=MAX_SEQ, memory_budget_gb=budget_gb)  # fmt: skip
-            self.model, _ = load_model(self.store_dir, mode, MAX_SEQ, budget_gb, None, rt)
+            self.model, details = load(self.store_dir, mode, rt, profile, budget_gb, start_cache_gb)
         else:
             self.model = self._synthetic_model(mode)
         self.loaded_key = key
         if isinstance(self.model.experts, CachedExpertSource):
             self.start_cache_bytes = self.model.experts.capacity_bytes
-        self.load_info = {"load_seconds": time.perf_counter() - t}
+        self.load_info = {"load_seconds": time.perf_counter() - t, **(details if source == 'real' else {})}
+        self.load_info['load_seconds'] = time.perf_counter() - t
         return {"reused": False, **self.load_info}
 
     def _synthetic_model(self, mode: str):
@@ -373,26 +402,32 @@ class Engine:
         return {"slots": experts.num_slots, "gb": experts.capacity_bytes / GB, "cached_experts": len(experts.cached_keys())}
 
     def _generate(self, req: Request, params: dict, out: queue.Queue, *, reuse: bool, label: str | None = None) -> dict:
-        from src.engine.runtime.auto import LiveBudget, store_facts
+        from src.engine.runtime.auto import store_facts
+        from src.dashboard.resources import SafeBudget, components
         from src.engine.runtime.streaming import IncrementalDecoder, stream_generate
 
         source, mode = params["source"], params["mode"]
         req.mode, req.phase, req.live = mode, "loading", None
         if not reuse:
             self.unload()
-        load = self._load(source, mode, params["start_cache_gb"], params["budget_gb"])
+        load = self._load(source, mode, params["start_cache_gb"], params["budget_gb"], params.get('profile', 'manual'))
+        effective = load.get('profile', {'profile': 'manual', 'budget_gb': params['budget_gb']})
+        params = {**params, 'budget_gb': effective['budget_gb'],
+                  'start_cache_gb': self.start_cache_bytes / GB if self.start_cache_bytes is not None else 0.0}
         self._reset_cache()
         cache_at_start = self._cache_state()
         if source == "real" and mode == "cached":
             rt = replace(self.rt, expert_cache_gb=params["start_cache_gb"], max_seq=MAX_SEQ, int8_kernel="fused")
             facts = store_facts(self.store_dir, rt, self.model.backend.name)
-            req.live = LiveBudget(self.model, facts, psutil.virtual_memory().total)
+            req.live = SafeBudget(self.model, facts, components(self.store_dir, rt)['transient'])
         decoder = IncrementalDecoder(self.tokenizer) if source == "real" else None
         out.put({"type": "start", "request_id": req.id, "run": label, "source": source, "mode": mode,
                  "model_reused": load["reused"], "load_seconds": load["load_seconds"], "cache": cache_at_start,
                  "prompt_tokens": len(params["ids"]), "max_new_tokens": params["max_new_tokens"], "max_seq": MAX_SEQ,
                  "budget_gb": params["budget_gb"], "live_budget": req.live is not None,
                  "memory": process_memory(),
+                 'resource_profile': effective,
+                 'backend': self.model.backend.name, 'int8_kernel': load.get('int8_kernel'), 'prompt_ids': params['ids'],
                  # echoed for the page's run record: what the server received and will run (no paths)
                  "prompt": params["prompt"], "start_cache_gb": params["start_cache_gb"],
                  "decoding": "greedy (argmax), stops at end-of-sequence or the token limit",
@@ -441,6 +476,7 @@ class Engine:
                   "cancel_delay_s": done.cancel_delay_s, "cancel_phase": done.cancel_phase,
                   "totals": totals, "cache_at_start": cache_at_start, "cache_at_end": self._cache_state(),
                   "memory": memory}  # fmt: skip
+        result['resource_profile'] = effective
         out.put(result)
         return result
 
@@ -451,12 +487,14 @@ class Engine:
                 break
             p = {**params, "mode": mode}
             results.append(self._generate(req, p, out, reuse=False, label=mode))
+            if results[-1].get("error"):
+                break
         self.unload()
         same = len(results) == 2 and results[0]["token_ids"] == results[1]["token_ids"]
         out.put({"type": "compare_done", "completed_runs": [r["mode"] for r in results],
                  "token_ids_identical": same if len(results) == 2 else None,
                  "runs": [{k: r[k] for k in ("mode", "stop_reason", "output_tokens", "time_to_first_token_s",
-                                             "decode_tokens_per_s", "load_seconds", "memory")} for r in results]})  # fmt: skip
+                                             "decode_tokens_per_s", "load_seconds", "memory", 'resource_profile', 'cache_at_start')} for r in results]})  # fmt: skip
 
     def status(self) -> dict:
         req = self.active
@@ -585,6 +623,14 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None):
             except ValueError:
                 length = -1
             if self.headers.get("Transfer-Encoding") or not 0 <= length <= (16_000 if access else 64_000):
+                # Drain only a small, bounded rejected body so Windows does not
+                # reset the connection before the client receives the refusal.
+                if not self.headers.get('Transfer-Encoding') and 0 < length <= 64_000:
+                    self.connection.settimeout(1)
+                    try:
+                        self.rfile.read(length)
+                    except OSError:
+                        pass
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": "missing or too large request body"})
             raw = self.rfile.read(length)
             if not self._host_ok():
@@ -632,7 +678,8 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None):
                 params = engine.validate(body, compare=compare)
             except BadRequest as e:
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": str(e)})
-            if access and (params["max_new_tokens"] > access.max_tokens or params["budget_gb"] > access.max_budget_gb or params["start_cache_gb"] > 1.3):
+            if access and (params["max_new_tokens"] > access.max_tokens or
+                           (params['profile'] != 'auto' and (params["budget_gb"] > access.max_budget_gb or params["start_cache_gb"] > 1.3))):
                 return self._json(HTTPStatus.BAD_REQUEST, {"error": "public limits: 96 output tokens per mode, 4 GB budget, 1.3 GB starting cache"})
             req = engine.try_begin("compare" if compare else "generate", params, owner=self.owner)
             if req is None:
@@ -673,7 +720,7 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None):
                     continue
                 if item is None:
                     break
-                if access and (item.get("type") == "error" or item.get("error")):
+                if access and not item.get('resource_error') and (item.get("type") == "error" or item.get("error")):
                     item = {**item, "error": "Engine run failed; ask the operator to check private logs."}
                     if item.get("type") == "error":
                         item["message"] = item["error"]

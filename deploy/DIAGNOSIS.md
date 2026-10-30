@@ -1,5 +1,9 @@
 # Cloud checkpoint: bounded diagnosis
 
+This retained result uses the **original small-cache configuration**. See the
+[machine-aware configuration correction and longer same-VM comparison](RESOURCE_PROFILE.md)
+for the follow-up. The measurements below and raw records are preserved.
+
 This is an operator diagnostic on the existing D4ds_v4 (four vCPUs, 16 GiB), not a
 benchmark study or a cloud speedup claim. Historical laptop evidence is unchanged.
 The prompt was “What is 2 + 2? Give a short answer.” with exactly four requested

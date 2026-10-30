@@ -152,9 +152,21 @@
   }
 
   function settings() {
-    return { max_new_tokens: Number($("max-new").value), budget_gb: Number($("budget").value),
+    return { profile: $("memory-profile").value, max_new_tokens: Number($("max-new").value), budget_gb: Number($("budget").value),
              start_cache_gb: Number($("start-cache").value) };
   }
+  function profileChanged() {
+    const automatic = $("memory-profile").value === "auto";
+    $("budget").disabled = automatic; $("start-cache").disabled = automatic;
+    $("budget").closest("label").hidden = automatic;
+    $("start-cache").closest("label").hidden = automatic;
+    if ($("memory-profile").value === "constrained") { $("budget").value = "3.5"; $("start-cache").value = "1.2"; }
+    $("profile-help").textContent = automatic ?
+      "Automatic measures physical RAM and Windows commit headroom at each model load, reserves runtime allocations and safety headroom, then selects the cache. Effective values appear in Run details." :
+      "Explicit application planning budget and expert cache. Constrained adaptation retains the original 3.5 GB / 1.2 GB starting settings. Neither setting limits Windows file cache or total RAM. Requests that do not fit safe headroom are refused.";
+  }
+  $("memory-profile").addEventListener("change", profileChanged);
+  profileChanged();
 
   // ------------------------------------------------------------ status
 
@@ -193,7 +205,7 @@
     ui.otherVisitorBusy = protectedSite && s.busy && !s.active;
     $("engine-availability").hidden = !protectedSite;
     $("engine-availability").textContent = ui.otherVisitorBusy ? "Engine busy with another visitor. No queue; retry when it is available." :
-      "Protected cloud session. One active job; no queue. Up to 96 output tokens per mode and 10 minutes per job. Memory budget is a process planning target, not a limit on Windows file cache or VM RAM.";
+      "Protected cloud session. Automatic uses measured machine headroom. Manual/constrained limits: 4 GB budget, 1.3 GB cache. One active job; no queue; 96 tokens per mode, 10 minutes per job. Application budgets do not limit Windows file cache or VM RAM.";
     $("max-new").max = s.limits.max_new_tokens;
     for (const prefix of ["run", "cmp"]) $(prefix + "-advanced").hidden = protectedSite;
     const ok = s.real_store.available;
@@ -359,8 +371,12 @@
       ["Prompt (as submitted)", s.prompt],
       ["Model", SOURCE_LONG[s.source]],
       ["Execution", MODE_LONG[s.mode]],
+      ["Memory profile", ({auto: "Automatic for this machine", manual: "Manual settings", constrained: "Constrained adaptation experiment"})[s.resource_profile?.profile || "manual"]],
+      ["Effective planning budget", s.budget_gb == null ? "OS-managed paging; no RAM cap" : `${fmt(s.budget_gb)} GB`],
+      ["Actual cache capacity", s.cache ? `${s.cache.slots} experts / ${fmt(s.cache.gb, 3)} GB` : "OS-managed mappings"],
+      ["Safety reserve", s.resource_profile?.reserve_bytes ? `${fmt(s.resource_profile.reserve_bytes / 1e9)} GB` : "unavailable"],
       ["Settings", `max ${s.max_new_tokens} new tokens, context ${s.max_seq}` +
-        (s.source === "real" ? `, budget ${s.budget_gb} GB, starting cache ${s.start_cache_gb} GB` : "")],
+        (s.source === "real" && s.budget_gb != null ? `, budget ${fmt(s.budget_gb)} GB, starting cache ${fmt(s.start_cache_gb, 3)} GB` : "")],
       ["Decoding", s.decoding],
       ["Threads (OpenBLAS / numba)", `${s.threads.openblas} / ${s.threads.numba}`],
       ["Model load", s.model_reused ? "reused (already loaded)" : `${fmt(s.load_seconds, 1)} s`],
@@ -512,6 +528,7 @@
       for (const run of ["cached", "mmap"]) if (!ev.completed_runs.includes(run)) stepState(run, "Not run");
       const rows = [];
       for (const r of ev.runs) {
+        rows.push([`${MODE_NAME[r.mode]}: memory profile`, `${r.resource_profile?.profile || "manual"}; cache ${r.cache_at_start ? fmt(r.cache_at_start.gb, 3) + " GB" : "OS-managed"}`]);
         rows.push([`${MODE_NAME[r.mode]}: model load`, `${fmt(r.load_seconds, 1)} s (fresh load)`]);
         rows.push([`${MODE_NAME[r.mode]}: peak working set (sampled)`, `${fmt(r.memory.peak_working_set_gb)} GB`]);
         rows.push([`${MODE_NAME[r.mode]}: output tokens, stop`, `${r.output_tokens}, ${r.stop_reason}`]);
