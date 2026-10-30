@@ -14,7 +14,7 @@ Each entry: **Decision** (what was chosen), **Why**, **Rejected** (what wasn't, 
 ## Model and store
 **Decision:** Use the Qwen1.5-MoE-A2.7B-Chat int8 store that ExpertRelay had already built (14.36 GB, kept outside the repository), not OLMoE-1B-7B.
 **Why:** A first OLMoE load test (through transformers) was stopped while still downloading; the model needs about 14 GB in fp16 on an 8 GB machine. The Qwen store already existed, runs under a memory budget with an expert cache, and generated correctly on this laptop.
-**Rejected:** OLMoE through transformers (no evidence it fits, and no expert-level cache control). Building a new store (ExpertRelay's builder is not ported and needs the 27 GB bf16 checkpoint).
+**Rejected:** OLMoE through transformers (no evidence it fits, and no expert-level cache control). Building a new store (it needs the 28.6 GB bf16 checkpoint; the builder module was later ported for the engine tests only, and building a real store with it is untested here).
 **Note:** The OLMoE test script (`test_load.py`) and its transformers/accelerate requirements were removed in the repository cleanup; it remains in the Git history.
 
 ## Synthetic fallback, labeled
@@ -68,6 +68,11 @@ Each entry: **Decision** (what was chosen), **Why**, **Rejected** (what wasn't, 
 **Decision:** Report a fresh comparison against the engine's memory-mapped source (Windows paging, no expert cache, no prefetch), both modes with 4 OpenBLAS threads, three prompts, two runs per mode, rotating order.
 **Why:** The submission had no measured baseline. Result: decode mean 1.842 against 0.891 tok/s (ratio of means 2.07, median matched pair 2.44, cached faster in 5 of 6 pairs); median time to first token 7.3 against 19.1 s (lower in 5 of 6 pairs); identical token ids. Memory-mapping used far less private memory (0.33 to 0.35 against 2.90 GB) but more physical RAM (working set up to 4.74 against 2.76 GB).
 **Rejected:** A single headline multiplier: matched pairs ranged from 0.92 to 11.2 because memory-mapped speed depends on how much of the store Windows has cached (one warm memory-mapped run beat its cached partner). Clearing the system cache to force cold runs (not done, by instruction). Crediting the speed difference to this submission: the cache, unbuffered reads and prefetch are ExpertRelay's design.
+
+## Engine tests (2026-10-30)
+**Decision:** Port three of ExpertRelay's pytest files into `tests/engine/` (`test_expert_cache.py`, `test_runtime_auto.py`, `test_runtime_correctness.py`), the helper that builds a test store, and the store builder module it calls (`src/engine/store/build_store.py`). Imports rewritten, attribution headers added, assertions unchanged. pytest is a development-only requirement (`requirements-dev.txt`).
+**Why:** Nothing in the repository tested the engine's cache resizing, LiveBudget or output preservation; the real-model demo needs a 14 GB store reviewers won't have. These tests build a tiny random-weight store in a temporary directory and run the real engine on it. Result on Windows: 63 passed, 0 failed, 0 skipped (with the 40 existing tests, 103 passed). The committed result files were hash-checked before and after: unchanged.
+**Rejected:** Porting `conftest.py` and the tokenizer fixture (none of the three files uses them), the test against Hugging Face transformers (needs transformers) and the store-pipeline and benchmark tests (outside the demo's scope). Placing the pytest files directly in `tests/`: the standard-library `python -m unittest discover -s tests` would then fail to import them without pytest.
 
 ## Repository cleanup
 **Decision:** Remove `test_load.py`, CONTRACT.md (its layout and rules now live in the README and results/EVIDENCE.md) and empty placeholder files; consolidate result details into results/EVIDENCE.md; keep every result file, including the earlier pair made before the accounting correction and the noisy exploratory prefetch run.

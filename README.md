@@ -44,13 +44,20 @@ python eval/compare_artifacts.py results/adaptive_demo_20261030-060626.json resu
 python -m unittest discover -s tests -v
 ```
 
+**Engine tests (no model needed, Windows).** These are ExpertRelay's own engine tests, ported with the store builder they use. Each test builds a tiny random-weight model and store in a temporary folder and runs the real engine code on it: cache resizing, the live budget changing mid-generation (shrinking to the minimum and growing back), and bit-identical output across expert sources, cache sizes and prefetch settings. They show the engine's mechanisms behave as specified on that synthetic store; they say nothing about the real model's output quality or speed. They need Windows (the unbuffered reader uses Win32) and are skipped elsewhere; a skipped test is not a passed one.
+
+```
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
 **Toy fallback (no model needed).** `src/synthetic_moe.py` writes 8 tiny experts to disk and times disk loads against cache hits. It is not a model, doesn't use the engine or LiveBudget, and says nothing about real-model performance.
 
 ```
 python -m src.synthetic_moe
 ```
 
-**Real model (needs the external store).** The Qwen1.5-MoE-A2.7B-Chat int8 store (14.36 GB) is not in this repository, and the ExpertRelay store builder that produced it is not included. With the store in a folder named `qwen1.5-moe-a2.7b-chat-int8` inside some directory:
+**Real model (needs the external store).** The Qwen1.5-MoE-A2.7B-Chat int8 store (14.36 GB) is not in this repository. The ExpertRelay store builder is included only because the engine tests use it (`src/engine/store/build_store.py`); building the real store with it hasn't been tried here and would need the original 28.6 GB bf16 checkpoint. With the store in a folder named `qwen1.5-moe-a2.7b-chat-int8` inside some directory:
 
 ```
 set LEANMOE_MODELS_ROOT=C:\path\to\that\directory
@@ -142,7 +149,7 @@ Decode was faster with the cache in 5 of 6 matched pairs: about 2 times on avera
   ```
 
 - **The fixed-cache example is a startup refusal.** Each demo run also starts a run whose fixed cache is too large for the cut budget; the memory guard refuses it on its estimate. It is not an out-of-memory crash or a speed baseline; a fixed cache sized for the smaller budget would start.
-- **External, Windows-only model.** The 14.36 GB store isn't in this repository and can't be rebuilt from it; the real-model path uses Win32 unbuffered reads. This repository's tests cover the evidence checker and the memory-accounting baseline, not the engine's cache or LiveBudget behaviour.
+- **External, Windows-only model.** The 14.36 GB store isn't in this repository, and rebuilding it here is untested. The real-model path and the engine tests use Win32 unbuffered reads. The engine tests run on a tiny synthetic store, not the real model.
 
 ## Repository layout
 
@@ -152,7 +159,7 @@ Decode was faster with the cache in 5 of 6 matched pairs: about 2 times on avera
 - `eval/compare_artifacts.py` — standard-library checker for an uncut and a cut run.
 - `eval/prefetch_ablation.py` — prefetch on/off experiment.
 - `eval/config_compare.py` — BLAS-thread and memory-mapping comparisons.
-- `tests/` — standard-library regression tests.
+- `tests/` — standard-library tests for the evidence checker and memory accounting; `tests/engine/` — engine tests ported from ExpertRelay (pytest, Windows), run with `python -m pytest`.
 - `configs/` — engine configs, prompt set and prefetch calibrations. `runtime.json` (the engine's default config) and `runtime_cache.json` point at the base store, which these demos don't use.
 - `results/` — raw result files, indexed in [results/EVIDENCE.md](results/EVIDENCE.md).
 - [DECISIONS.md](DECISIONS.md) — what was decided, why, and what was rejected.

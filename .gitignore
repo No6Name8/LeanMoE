@@ -25,3 +25,6 @@ models/
 
 # Scratch file the adaptive demo rewrites while it runs
 results/adaptive_budget.txt
+
+# pytest
+.pytest_cache/
