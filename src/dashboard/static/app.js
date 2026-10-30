@@ -70,8 +70,15 @@
 
   // ------------------------------------------------------------ tabs and choices
 
+  // The System details popover floats over the page: close it on any outside click,
+  // on Escape and on a tab change, so it never covers buttons.
+  const sysDetails = document.querySelector(".system details");
+  document.addEventListener("click", (e) => { if (sysDetails.open && !sysDetails.contains(e.target)) sysDetails.open = false; });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") sysDetails.open = false; });
+
   const tabs = ["run", "compare", "evidence"];
   function showTab(name) {
+    sysDetails.open = false;
     for (const t of tabs) {
       const on = t === name;
       $("tab-" + t).setAttribute("aria-selected", String(on));
