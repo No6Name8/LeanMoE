@@ -8,7 +8,7 @@ This submission evaluates that design on the real model, including an **adaptive
 
 **Supported:** Windows 10 or 11, 64-bit, with Python 3.13 (tested on Windows 11 with Python 3.13.14; Python 3.10 to 3.12 may work but are untested). Linux and macOS are not supported: the engine reads expert weights with Windows-only unbuffered file I/O, so on those systems the engine tests are skipped (skipped is not passed) and only the saved-evidence checker runs. You also need Git and an internet connection for the package install.
 
-There is **no web dashboard yet**; everything runs from the command line. The quick-verification commands below were run word for word in a fresh clone of commit e8a27a8 in a new PowerShell session on the development laptop (Windows 11, Python 3.13.14), not yet on another machine.
+There is **no web dashboard yet**; everything runs from the command line. The quick-verification commands below were run word for word in a fresh clone of commit e8a27a8 in a new PowerShell session on the development laptop (Windows 11, Python 3.13.14), not yet on another machine. Later commits added tests (125 now); those were run in the development environment, not in a fresh clone.
 
 ### Path 1: quick verification (no model download)
 
@@ -25,8 +25,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1
 What each step does and what success looks like:
 
 - **`setup.ps1`** creates `.venv` inside the repository, installs the packages in `requirements-dev.txt` (numpy, numba, psutil, tokenizers, jinja2, pytest) and runs the preflight check. It ends with `Setup complete.` It is safe to rerun, downloads no model files and changes no system settings (`-ExecutionPolicy Bypass` applies to that one PowerShell process only). Measured on a fresh clone on the development laptop (packages downloaded fresh, no pip cache): 114 s; a rerun takes a few seconds.
-- **`pytest`** runs 103 tests and should end with `103 passed`. 63 of them are ExpertRelay's engine tests: each builds a tiny random-weight model and expert store in a temporary folder and runs the real engine on it, covering cache resizing, the live memory budget shrinking and growing mid-generation, and bit-identical output across expert sources, cache sizes and prefetch settings. The other 40 test the evidence checker and the memory-accounting baseline. These show the engine's mechanisms behave as specified on a synthetic model; they say nothing about the real model's quality or speed. Any `failed` or `skipped` count means that part was not verified. Measured time: 22 s.
+- **`pytest`** runs 125 tests and should end with `125 passed`. 63 are ExpertRelay's engine tests: each builds a tiny random-weight model and expert store in a temporary folder and runs the real engine on it, covering cache resizing, the live memory budget shrinking and growing mid-generation, and bit-identical output across expert sources, cache sizes and prefetch settings. 15 test LeanMoE's streaming generation on the same kind of store (same tokens as the batch path, end-of-sequence stop, length checks before allocation, cancellation, cleanup after errors, consecutive requests). The other 47 test the evidence checker, the memory-accounting baseline and streaming text decoding. These show the engine's mechanisms behave as specified on a synthetic model; they say nothing about the real model's quality or speed. Any `failed` or `skipped` count means that part was not verified. Measured time: 22 s.
 - **`compare_artifacts.py`** reads two committed result files from real-model runs and should print `PASS: identical generated token ids (80 tokens) ...`. It checks the **recorded** evidence; it does not rerun the real model.
+
+**Streaming example (optional, no download).** `.\.venv\Scripts\python.exe -m eval.stream_demo --cancel-after-tokens 5` streams token ids from the tiny synthetic model and cancels after five; the output ids are meaningless, it shows the mechanics. With the real store, add `--real --prompt "..."` to stream text (see `--help`).
 
 The preflight check can be rerun at any time: `.\.venv\Scripts\python.exe scripts\preflight.py`. Passing it does not guarantee a real-model run will fit in memory.
 
@@ -187,6 +189,7 @@ Decode was faster with the cache in 5 of 6 matched pairs: about 2 times on avera
 - `eval/compare_artifacts.py` — standard-library checker for an uncut and a cut run.
 - `eval/prefetch_ablation.py` — prefetch on/off experiment.
 - `eval/config_compare.py` — BLAS-thread and memory-mapping comparisons.
+- `src/engine/runtime/streaming.py` and `text_stream.py` — streaming generation (end-of-sequence stop, limits, cancellation, safe incremental text); `eval/stream_demo.py` — command-line example.
 - `tests/` — standard-library tests for the evidence checker and memory accounting; `tests/engine/` — engine tests ported from ExpertRelay (pytest, Windows), run with `python -m pytest`.
 - `configs/` — engine configs, prompt set and prefetch calibrations. `runtime.json` (the engine's default config) and `runtime_cache.json` point at the base store, which these demos don't use.
 - `results/` — raw result files, indexed in [results/EVIDENCE.md](results/EVIDENCE.md).
