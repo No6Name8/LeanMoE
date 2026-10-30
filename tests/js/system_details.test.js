@@ -1,0 +1,36 @@
+"use strict";
+const assert = require("node:assert/strict");
+const {view, processor} = require("../../src/dashboard/static/systemview.js");
+const now = Date.parse("2026-10-30T06:00:00Z");
+const status = {busy:false, system:{execution_location:"local", measured_at:new Date(now).toISOString(),
+  cpu:"12th Gen Intel(R) Core(TM) i5-12450H", ram_total_gb:8.3, ram_available_gb:1.2,
+  process_private_gb:0.256, loaded_model:"none", execution_mode:null}};
+assert.equal(processor(status.system.cpu), "Intel Core i5-12450H");
+assert.equal(processor("AMD Ryzen 7 7840U"), "AMD Ryzen 7 7840U");
+let v = view(status, false, now);
+assert.deepEqual(v.rows.map(r=>r[0]), ["Running on", "Processor", "RAM", "Engine memory", "Status"]);
+assert.equal(v.rows[0][1], "This computer");
+assert.equal(v.rows[2][1], "8.30 GB total / 1.20 GB available");
+assert.equal(v.rows[3][1], "0.26 GB (private committed)");
+assert.equal(v.rows[4][1], "Idle");
+assert.equal(v.updated, "Updated just now");
+assert.equal(view(status,false,now+14000).warning,false);
+assert.match(view(status,false,now+15000).updated,/Stale measurements.*15s ago/);
+assert.match(view(status,true,now).rows[4][1],/Disconnected - last known: Idle/);
+assert.match(view(status,false,now+120000).updated,/2m ago/);
+assert.match(view(status,false,now+7200000).updated,/2h ago/);
+assert.match(view(null,true,now).updated,/Disconnected.*unavailable/);
+assert.equal(view({system:{}} ,false,now).rows[1][1],"unavailable");
+status.system.execution_location="server";
+status.busy=true; status.active={phase:"loading",source:"real",mode:"cached"};
+v=view(status,false,now);
+assert.equal(v.rows[0][1],"Cloud server");
+assert.match(v.rows[4][1],/^Loading - Qwen \/ LeanMoE$/);
+status.active.phase="prefill"; status.system.loaded_model="Qwen1.5-MoE-A2.7B-Chat (int8)";
+status.system.execution_mode="mmap";
+assert.match(view(status,false,now).rows[4][1],/^Running.*Qwen.*Windows paging$/);
+status.busy=false;
+assert.match(view(status,false,now).rows[4][1],/^Idle.*Qwen.*Windows paging$/);
+assert.ok(v.technical.some(r=>r[0]==="Measured at (UTC)" && r[1]===status.system.measured_at));
+assert.ok(v.technical.some(r=>r[0]==="Windows commit - headroom"));
+console.log("system details checks passed");

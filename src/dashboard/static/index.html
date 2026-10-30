@@ -18,7 +18,14 @@
     <span id="store-pill" class="pill">Checking model…</span>
     <details class="details inline">
       <summary>System details</summary>
-      <dl id="system-details" class="kv"></dl>
+      <div id="system-popover">
+        <p id="system-updated" class="hint" role="status">Checking backend...</p>
+        <dl id="system-details" class="kv"></dl>
+        <details class="details compact" id="system-technical">
+          <summary>Technical details</summary>
+          <dl id="system-technical-values" class="kv"></dl>
+        </details>
+      </div>
     </details>
   </div>
 </header>
@@ -232,6 +239,7 @@
 
 <script src="/static/katex/katex.min.js"></script>
 <script src="/static/mathsplit.js"></script>
+<script src="/static/systemview.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

@@ -88,7 +88,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .details[open] > summary { color: var(--text); }
 .details.inline { margin: 0; }
 .details.inline[open] { position: relative; }
-.details.inline[open] .kv { position: absolute; right: 0; z-index: 5; width: min(440px, 90vw); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+.details.inline[open] #system-popover { position: absolute; right: 0; z-index: 5; width: min(440px, 90vw); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
 .settings { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 18px; }
 .settings-grid { display: flex; flex-wrap: wrap; gap: 18px; padding: 6px 0 4px; }
 .settings-grid label { color: var(--muted); font-size: 0.9rem; }
@@ -176,7 +176,7 @@ a { color: var(--accent); }
 .check { flex-wrap: wrap; }
 
 /* System snapshot stays within the viewport, including long phone layouts. */
-.details.inline[open] .kv { width: min(560px, 94vw); max-height: 72vh; overflow-y: auto; }
+.details.inline[open] #system-popover { width: min(560px, 94vw); max-height: 72vh; overflow-y: auto; }
 .experiment h3 { font-size: 1rem; margin: 0 0 8px; }
 .experiment h4 { font-size: .9rem; margin: 14px 0 4px; }
 .experiment .result { margin: 0; font-weight: 600; }
@@ -185,5 +185,9 @@ a { color: var(--accent); }
 .evidence-intro p { margin: 8px 0; }
 #additional-recorded { margin-top: 12px; }
 @media (max-width: 720px) {
-  .details.inline[open] .kv { position: fixed; left: 12px; right: 12px; top: 120px; width: auto; max-height: calc(100dvh - 136px); }
+  .details.inline[open] #system-popover { position: fixed; left: 12px; right: 12px; top: 120px; width: auto; max-height: calc(100dvh - 136px); }
 }
+
+#system-popover .kv { position: static; width: auto; max-height: none; padding: 0; border: 0; box-shadow: none; }
+#system-popover > .hint { margin: 0 0 10px; }
+#system-popover .system-warning { color: var(--warn); font-weight: 600; }

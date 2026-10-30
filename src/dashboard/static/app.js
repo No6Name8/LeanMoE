@@ -157,11 +157,32 @@
 
   // ------------------------------------------------------------ status
 
+  let statusPending = false;
+  let disconnected = false;
+  function renderSystem() {
+    const v = window.LeanMoESystem.view(ui.status, disconnected);
+    setKV($("system-details"), v.rows);
+    setKV($("system-technical-values"), v.technical);
+    $("system-updated").textContent = v.updated;
+    $("system-updated").className = v.warning ? "hint system-warning" : "hint";
+  }
   async function loadStatus() {
+    if (statusPending) return;
+    statusPending = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     let s;
-    try { s = await (await fetch("/api/status")).json(); } catch (e) {
-      $("store-pill").textContent = "Server not reachable"; $("store-pill").className = "pill no"; return;
-    }
+    try {
+      const response = await fetch("/api/status", {signal: controller.signal});
+      if (!response.ok) throw new Error("status unavailable");
+      s = await response.json();
+      if (!s.system || !s.real_store || !s.limits) throw new Error("invalid status");
+      disconnected = false;
+    } catch (e) {
+      disconnected = true;
+      $("store-pill").textContent = "Server not reachable"; $("store-pill").className = "pill no";
+      renderSystem(); return;
+    } finally { clearTimeout(timeout); statusPending = false; }
     ui.status = s;
     const ok = s.real_store.available;
     $("store-pill").textContent = ok ? "Qwen ready" : "Qwen not installed";
@@ -175,27 +196,7 @@
       m.execution_location === "server" ? "Server engine dashboard" : "Engine dashboard";
     $("live-location").textContent = m.execution_location === "local" ? "measured on the local backend" :
       m.execution_location === "server" ? "measured on the server backend" : "backend location unavailable";
-    const available = (v) => v === null || v === undefined || v === "" ? "unavailable" : String(v);
-    const gb = (v) => v === null || v === undefined ? "unavailable" : `${fmt(v, 3)} GB`;
-    const mode = (v) => ({cached: "LeanMoE (cache + prefetch)", mmap: "Windows paging"}[v] || "unavailable");
-    setKV($("system-details"), [
-      ["Execution location (configured)", {local: "Local computer - backend", server: "Server - backend (not this browser's computer)"}[m.execution_location] || "unavailable"],
-      ["Measured at (UTC)", available(m.measured_at)],
-      ["Backend OS", available(m.os)], ["Backend CPU", available(m.cpu)],
-      ["Logical CPU cores", available(m.logical_cores)],
-      ["Physical RAM - total", gb(m.ram_total_gb)],
-      ["Physical RAM - available", gb(m.ram_available_gb)],
-      ["Windows commit - headroom", gb(m.windows_commit?.headroom_gb)],
-      ["Windows commit - limit", gb(m.windows_commit?.limit_gb)],
-      ["Process private - committed", gb(m.process_private_gb)],
-      ["Process working set - in RAM", gb(m.process_working_set_gb)],
-      ["Effective OpenBLAS threads", available(m.threads?.openblas)],
-      ["Effective numba threads", available(m.threads?.numba)],
-      ["Loaded model", available(m.loaded_model)],
-      ["Loaded execution mode", m.loaded_model === "none" ? "none" : mode(m.execution_mode)],
-      ["Active request mode", s.busy ? mode(m.active_mode) : "none"],
-      ["Memory units", "GB = 1,000,000,000 bytes; snapshot, not peak. Commit headroom is system-wide allocation capacity, not free RAM."],
-    ]);
+    renderSystem();
     // Avoid replacing open methodology panels when system data is refreshed.
     const recordedKey = JSON.stringify(s.recorded);
     if (ui.recordedKey !== recordedKey) { renderRecorded(s.recorded); ui.recordedKey = recordedKey; }
@@ -228,6 +229,7 @@
   }
   sysDetails.addEventListener("toggle", () => { if (sysDetails.open) loadStatus(); });
   setInterval(() => { if (sysDetails.open) loadStatus(); }, 5000);
+  setInterval(() => { if (sysDetails.open) renderSystem(); }, 1000);
 
   // ------------------------------------------------------------ Run tab
 
