@@ -2,7 +2,15 @@
 
 A mixture-of-experts (MoE) model only uses a few of its experts for each token, so it doesn't need all its weights in RAM at once. LeanMoE runs Qwen1.5-MoE-A2.7B-Chat, whose int8 weights take 14.36 GB on disk, on a laptop with 8.30 GB of RAM: shared weights stay in memory, routed experts are read from the SSD when needed, a RAM cache keeps recently used experts, and a predictor starts reading the next layer's likely experts early.
 
-This submission's addition is an **adaptive memory budget test on the real model**: the budget is cut while the model is generating, the expert cache shrinks between tokens, and generation continues with the same output.
+This submission evaluates that design on the real model, including an **adaptive memory budget**: the budget is cut while the model is generating, the expert cache shrinks between tokens, and generation continues with the same output.
+
+## Results at a glance
+
+Measured on one 8 GB Windows laptop; details and caveats below and in [results/EVIDENCE.md](results/EVIDENCE.md).
+
+- **About 2x the decode throughput of Windows memory-mapping.** Against the same store memory-mapped and paged in by Windows, the cached engine with prefetch averaged 1.842 against 0.891 tokens/s (ratio of means 2.07) and was faster in 5 of 6 matched comparisons; individual pairs ranged from 0.92 to 11.2 because memory-mapped speed depends on what Windows already has cached. Three prompts, two runs each, identical output. [`config_compare_mmap_full_20261030-060448.json`](results/config_compare_mmap_full_20261030-060448.json)
+- **Budget cut mid-generation, same output.** The budget dropped from 3.5 to 2.5 GB after token 20; the expert cache shrank from 124 to 59 experts, measured private memory fell to 2.390 GB, and all 80 generated tokens match the uncut reference run. One prompt. [`adaptive_demo_20261030-060626.json`](results/adaptive_demo_20261030-060626.json) (uncut), [`adaptive_demo_20261030-060728.json`](results/adaptive_demo_20261030-060728.json) (cut)
+- **First token in 9.5 and 9.9 s** in that demo pair. Of 13 other cached runs with the same thread setting, 11 took 6.7 to 9.8 s and two were slow outliers (28.8 and 38.5 s).
 
 ## Prior work: ExpertRelay
 
@@ -12,11 +20,12 @@ From ExpertRelay: the int8 expert store format and readers, the numpy runtime wi
 
 New in LeanMoE:
 
-- the port (imports, `LEANMOE_MODELS_ROOT`, optional MindSpore);
-- the adaptive-budget demo, its strict evidence checker and regression tests;
-- a prefetch on/off experiment on the Chat store;
-- a memory-accounting correction in the engine's estimate (see below);
-- the measurements in this README.
+- **The port:** imports, store location through `LEANMOE_MODELS_ROOT`, optional MindSpore.
+- **Real-model evaluation of LiveBudget:** the budget-cut demo (`eval/adaptive_demo.py`), a strict checker for its result files (`eval/compare_artifacts.py`) and regression tests (`tests/`). ExpertRelay's own notes record LiveBudget as tested for identical tokens but not yet measured on the real model.
+- **Memory-accounting correction:** the engine's estimate now counts memory committed before loading (result 2).
+- **Thread tuning:** OpenBLAS defaults to 4 threads (result 3).
+- **Comparison harnesses:** prefetch on/off (`eval/prefetch_ablation.py`) and BLAS threads and memory-mapped baseline (`eval/config_compare.py`).
+- **The measurements** in this README.
 
 ## Quick start
 
@@ -74,15 +83,22 @@ The 80 generated token ids are identical between the two runs, for this one prom
 
 **2. The memory estimate now covers what the budget is compared against.** The engine sizes the cache from an estimate of the rest of the process. That estimate used a fixed 200 MiB interpreter baseline, but importing numpy commits about 34 MB per OpenBLAS thread (381 MB with 12 threads here), almost none of it in physical RAM. The baseline is now the larger of the constant and the private memory measured when the engine is imported (401 MB here with 12 OpenBLAS threads, 132 MB with the current default of 4).
 
-| Cut run | Budget after cut | Measured private memory after cut | Cache after cut |
-|---|---|---|---|
-| Before the correction | 2.5 GB | 2.660 GB (0.160 over) | 59 experts |
-| After | 2.5 GB | 2.468 GB (0.032 under) | 37 experts |
-| Before the correction | 2.2 GB | 2.354 GB (0.154 over) | 24 experts |
-| After | 2.7 GB | 2.668 GB (0.032 under) | 60 experts |
-| After, with 4 OpenBLAS threads (result 3) | 2.5 GB | 2.390 GB (0.110 under) | 59 experts |
+Before and after, matched: the same cut from 3.5 to 2.5 GB after token 20, 12 OpenBLAS threads (the starting cache was 1.5 GB before and 1.3 GB after, so the corrected estimate fit the starting budget; the cache after the cut is set by the budget).
 
-The first four rows used 12 OpenBLAS threads. With 12 threads the correction cost cache space at the same budget (37 instead of 59 experts at 2.5 GB); 4 threads won it back (result 3). Decode time for tokens 21 to 80 was 0.626 s per token after the correction and 0.637 before, a difference smaller than the per-token spread (standard deviation about 0.06 s). Memory was sampled once per token in the per-token log and every 50 ms by a background sampler; sampled peaks can miss shorter allocations. The budget is still a target the engine plans against, not a hard ceiling: nothing stops the process if it goes over.
+| Cut run | Measured private memory after the cut | Cache after the cut |
+|---|---|---|
+| Before the correction | 2.660 GB (0.160 over the 2.5 GB budget) | 59 experts |
+| After the correction | 2.468 GB (0.032 under) | 37 experts |
+
+Single runs with other settings, not before/after pairs:
+
+| Run | Budget after the cut | Measured private memory after the cut | Cache after the cut |
+|---|---|---|---|
+| Before the correction, 12 threads, review run | 2.2 GB | 2.354 GB (0.154 over) | 24 experts |
+| After the correction, 12 threads | 2.7 GB | 2.668 GB (0.032 under) | 60 experts |
+| After the correction, 4 threads (primary demo pair) | 2.5 GB | 2.390 GB (0.110 under) | 59 experts |
+
+With 12 threads the correction cost cache space at the same budget (37 instead of 59 experts at 2.5 GB); with 4 threads the cache after the same cut was 59 experts again (result 3). Decode time for tokens 21 to 80 was 0.626 s per token after the correction and 0.637 before, a difference smaller than the per-token spread (standard deviation about 0.06 s). Memory was sampled once per token in the per-token log and every 50 ms by a background sampler; sampled peaks can miss shorter allocations. The budget is still a target the engine plans against, not a hard ceiling: nothing stops the process if it goes over.
 
 **3. Four OpenBLAS threads instead of twelve: much faster first token, a larger cache, mixed decode speed.** Same 3.0 GB budget, cache sized by the normal budget calculation, prefetch on, 48 tokens, three prompts, two runs per configuration in alternating order. This compares two thread-and-cache configurations together, not either effect alone. Decoding runs on numba's own 12 threads in both.
 
@@ -101,7 +117,7 @@ Time to first token fell to 7 to 9 s in 5 of 6 matched pairs. Decode speed went 
 | 1.1 GB (126 experts) | mean 1.657, range 1.473 to 1.803 | mean 1.550, range 1.414 to 1.637 | 6 of 6 |
 | 0.6 GB (69 experts), exploratory | mean 1.281, range 0.803 to 1.656 | mean 0.946, range 0.425 to 1.437 | 5 of 6 |
 
-At 1.1 GB, prefetch was faster by 4.3%, 8.9% and 7.3% on the three prompts, and for each prompt both prefetch runs beat both no-prefetch runs. Token ids were identical across all runs of each prompt. The 0.6 GB run was noisy: compute time per token swung from 0.13 to 0.97 s while other programs used the machine, and a 69-expert cache is smaller than the 96 experts one token uses, so the cache alone got no hits. The default (adaptive prefetch on) is unchanged. An earlier ExpertRelay benchmark on the base store, where the cache alone was fastest, did not reproduce here.
+At 1.1 GB, prefetch was faster by 4.3%, 8.9% and 7.3% on the three prompts, and for each prompt both prefetch runs beat both no-prefetch runs. Token ids were identical across all runs of each prompt. The 0.6 GB run was noisy: compute time per token swung from 0.13 to 0.97 s while other programs used the machine, and a 69-expert cache is smaller than the 96 experts one token uses, so the cache alone got no hits. The default (adaptive prefetch on) is unchanged. An earlier ExpertRelay benchmark on the base store, where the cache alone was fastest, did not reproduce here. **This isolated prefetch gain was measured with 12 OpenBLAS threads and has not been re-measured under the current 4-thread default.**
 
 **5. Against Windows memory-mapping.** The engine's memory-mapped source maps the whole store and lets Windows page weights in on demand, with no expert cache and no prefetch. Same store, kernel, 4 OpenBLAS threads, three prompts and 48 tokens; two runs per mode per prompt, order rotating, one process at a time.
 
@@ -112,21 +128,21 @@ At 1.1 GB, prefetch was faster by 4.3%, 8.9% and 7.3% on the three prompts, and 
 | Sampled peak private memory | 0.33 to 0.35 GB | 2.90 GB |
 | Sampled peak working set | 2.88 to 4.74 GB | 2.62 to 2.76 GB |
 
-Decode was faster with the cache in 5 of 6 matched pairs: about 2 times on average (ratio of means 2.07; median matched pair 2.44; individual pairs ranged from 0.92 to 11.2). Time to first token was 50 to 64% lower in 5 of 6 pairs; the exception was one cached run at 38.5 s. Token ids were identical across both modes for every prompt. Memory-mapping commits little private memory because the weights stay in Windows' file cache, but it took more physical RAM (up to 4.74 GB). Its speed depended on how much of the store Windows had already cached from earlier runs: one warm run reached 2.056 tok/s, faster than its cached partner. These runs measure ExpertRelay's design (cache, unbuffered reads, prefetch) on the current configuration; the design itself is prior work.
+Decode was faster with the cache in 5 of 6 matched pairs: about 2 times on average (ratio of means 2.07; median matched pair 2.44; individual pairs ranged from 0.92 to 11.2). Time to first token was 50 to 64% lower in 5 of 6 pairs; the exception was one cached run at 38.5 s. Token ids were identical across both modes for every prompt. Memory-mapping commits little private memory because the weights stay in Windows' file cache, but it took more physical RAM (up to 4.74 GB). Its speed depended on how much of the store Windows had already cached from earlier runs: one warm run reached 2.056 tok/s, faster than its cached partner. This compares the whole cached configuration (expert cache, unbuffered reads and prefetch together) with memory-mapping; it does not separate prefetch's share, which result 4 measured under the older 12-thread setting. The design itself is ExpertRelay's prior work.
 
 ## Limitations
 
-- **One machine, few prompts.** Output equality was tested on one demo prompt and three experiment prompts with greedy decoding; it is not a general correctness guarantee. Timings vary with background load and with what Windows already has cached; fresh processes are not cold-cache runs.
-- **The budget is a planning target.** LiveBudget and the startup guard work from an estimate. After the correction, measured private memory stayed under the cut budget in every per-token sample after each cut, and the 50 ms sampler's loading and prefill peaks stayed under the starting budget, but nothing enforces it and short spikes between samples aren't seen.
-- **Two Windows memory limits.** Commit headroom (commit limit minus memory already committed) must cover the process's private memory, or allocations fail. Free physical RAM decides how large LiveBudget lets the cache grow and how much the system pages. Check both:
+- **Small samples on one machine.** One demo prompt and three experiment prompts, two runs per configuration, greedy decoding, one 8 GB Windows laptop with other programs running. Output equality holds for those prompts only; output quality against the original model wasn't evaluated here.
+- **Timings are noisy.** Background load and Windows' file cache affect them; fresh processes are not cold-cache runs, and slow first-token outliers occurred.
+- **The budget is a planning target.** The engine sizes the cache from an estimate and doesn't enforce the budget; measured private memory stayed under it in the per-token samples after each cut since the correction, but short spikes between samples aren't seen.
+- **Memory headroom.** Windows commit headroom must cover the process's private memory (sampled peak 3.18 GB at the demo defaults) and free physical RAM limits the cache. Check both before running:
 
   ```
   powershell -Command "Get-Counter '\Memory\Committed Bytes','\Memory\Commit Limit','\Memory\Available MBytes'"
   ```
 
-- **The oversized fixed-cache example is a startup refusal.** Each demo run also starts a fresh run whose fixed cache is too large for the cut budget; the memory guard refuses it on its estimate. That is not an out-of-memory crash, not a speed baseline, and not evidence that fixed caching can't work: a fixed cache sized for the smaller budget would start.
-- **The model store is external** and can't be rebuilt from this repository.
-- **Windows only** for the real model: the unbuffered expert reader uses Win32 APIs.
+- **The fixed-cache example is a startup refusal.** Each demo run also starts a run whose fixed cache is too large for the cut budget; the memory guard refuses it on its estimate. It is not an out-of-memory crash or a speed baseline; a fixed cache sized for the smaller budget would start.
+- **External, Windows-only model.** The 14.36 GB store isn't in this repository and can't be rebuilt from it; the real-model path uses Win32 unbuffered reads. This repository's tests cover the evidence checker and the memory-accounting baseline, not the engine's cache or LiveBudget behaviour.
 
 ## Repository layout
 
