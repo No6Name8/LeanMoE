@@ -75,6 +75,28 @@ def process_private_bytes() -> int:
     return getattr(info, "private", None) or info.rss
 
 
+def openblas_threads() -> int | None:
+    """LeanMoE change: the thread count numpy's bundled OpenBLAS reports, or
+    None if the library or its query function can't be found."""
+    import ctypes
+    import glob
+    import os
+
+    import numpy
+
+    for path in glob.glob(os.path.join(os.path.dirname(numpy.__file__), "..", "numpy.libs", "*openblas*")):
+        try:
+            lib = ctypes.CDLL(path)
+        except OSError:
+            continue
+        for name in ("scipy_openblas_get_num_threads64_", "openblas_get_num_threads64_", "openblas_get_num_threads"):
+            if hasattr(lib, name):
+                f = getattr(lib, name)
+                f.restype = ctypes.c_int
+                return int(f())
+    return None
+
+
 def peak_process_rss_mb() -> float:
     """Peak memory used by the CURRENT process so far, in MB.
 

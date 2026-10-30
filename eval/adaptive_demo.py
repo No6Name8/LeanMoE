@@ -48,6 +48,7 @@ import psutil
 
 from eval.compare_artifacts import compare_runs
 from src.engine import REPO_ROOT
+from src.engine.benchmarking import openblas_threads
 from src.engine.cache.expert_cache import CachedExpertSource
 from src.engine.manager.profile import measure_memory
 from src.engine.runtime.auto import LiveBudget, store_facts
@@ -206,6 +207,7 @@ def run_adaptive(args: argparse.Namespace) -> dict:
         "prefetch_calibration": rt.prefetch_calibration.name if rt.prefetch_calibration else None,
         "prefetch_calibration_kind": rt.prefetch_calibration_kind,
         "prefill_pipelining": rt.prefill_pipelining,
+        "openblas_threads": openblas_threads(),
     }
     return {
         "settings": settings,
