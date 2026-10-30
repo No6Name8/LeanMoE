@@ -125,3 +125,29 @@ a { color: var(--accent); }
   .actions { margin-left: 0; }
   .metric-value { font-size: 1.4rem; }
 }
+
+/* ---- run layout with the "What am I running?" panel ---- */
+.run-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; grid-template-areas: "controls aside" "rest aside"; gap: 0 18px; align-items: start; }
+.area-controls { grid-area: controls; }
+.area-aside { grid-area: aside; }
+.area-rest { grid-area: rest; min-width: 0; }
+.choice { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.choice-label { width: 5.5em; color: var(--muted); font-size: 0.9rem; font-weight: 600; }
+.selection { color: var(--muted); font-size: 0.9rem; }
+.confirm { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.explain { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 12px; position: sticky; top: 12px; }
+.explain > summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
+.explain-lead { color: var(--muted); font-size: 0.85rem; margin: 6px 0 10px; }
+.explain-group { margin-bottom: 10px; }
+.explain-head { display: block; color: var(--muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.explain-item { font-size: 0.85rem; line-height: 1.45; padding: 7px 10px; border-radius: 8px; border-left: 3px solid transparent; color: var(--muted); margin-bottom: 4px; }
+.explain-item strong { display: block; color: var(--text); font-size: 0.9rem; }
+.explain-item.selected { background: var(--soft); border-left-color: var(--accent); color: var(--text); }
+.explain-item.selected strong::after { content: " · selected"; color: var(--accent); font-weight: 600; font-size: 0.8rem; }
+.link-button { background: none; border: none; color: var(--accent); padding: 0; text-decoration: underline; font-weight: 600; }
+.link-button:disabled { color: var(--muted); text-decoration: none; }
+@media (max-width: 860px) {
+  .run-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "controls" "aside" "rest"; }
+  .explain { position: static; margin-bottom: 16px; }
+  .choice-label { width: auto; }
+}

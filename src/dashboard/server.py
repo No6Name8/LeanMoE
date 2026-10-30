@@ -76,6 +76,15 @@ class BadRequest(ValueError):
     pass
 
 
+def _numba_threads() -> int | None:
+    try:
+        import numba
+
+        return numba.get_num_threads()
+    except ImportError:
+        return None
+
+
 def process_memory() -> dict:
     info = psutil.Process().memory_info()
     return {"private_gb": process_private_bytes() / GB, "working_set_gb": info.rss / GB}
@@ -369,7 +378,11 @@ class Engine:
                  "model_reused": load["reused"], "load_seconds": load["load_seconds"], "cache": cache_at_start,
                  "prompt_tokens": len(params["ids"]), "max_new_tokens": params["max_new_tokens"], "max_seq": MAX_SEQ,
                  "budget_gb": params["budget_gb"], "live_budget": req.live is not None,
-                 "memory": process_memory()})  # fmt: skip
+                 "memory": process_memory(),
+                 # echoed for the page's run record: what the server received and will run (no paths)
+                 "prompt": params["prompt"], "start_cache_gb": params["start_cache_gb"],
+                 "decoding": "greedy (argmax), stops at end-of-sequence or the token limit",
+                 "threads": {"openblas": openblas_threads(), "numba": _numba_threads()}})  # fmt: skip
         req.phase = "prefill"
         out.put({"type": "phase", "phase": "prefill", "run": label})
         sampler = Sampler()

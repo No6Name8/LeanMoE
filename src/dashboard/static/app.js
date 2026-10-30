@@ -102,15 +102,26 @@
       const g = b.dataset.group;
       document.querySelectorAll(`.segmented button[data-group="${g}"]`).forEach((o) => o.setAttribute("aria-checked", String(o === b)));
       pick[g] = b.dataset.value;
-      if (g === "source") updateSourceBadge();
+      updateSelection();
     });
   });
 
-  function updateSourceBadge() {
+  const SOURCE_SHORT = { real: "Qwen", synthetic: "Tiny model" };
+  const MODE_SHORT = { cached: "LeanMoE", mmap: "Windows paging" };
+  const SOURCE_LONG = { real: "Qwen — real model (Qwen1.5-MoE-A2.7B-Chat, int8)", synthetic: "Tiny model — engine test (random weights)" };
+  const MODE_LONG = { cached: "LeanMoE — cache + prefetch", mmap: "Baseline — Windows paging (memory-mapped)" };
+
+  function updateSelection() {
     const b = $("run-source-badge");
     const syn = pick.source === "synthetic";
-    b.textContent = syn ? "Synthetic demo: meaningless token ids" : "Real model";
+    b.textContent = syn ? "Tiny model: meaningless output" : "Qwen";
     b.className = "badge" + (syn ? " synthetic" : "");
+    $("run-selection").textContent = `Model: ${SOURCE_SHORT[pick.source]} · Method: ${MODE_SHORT[pick.mode]}`;
+    document.querySelectorAll(".explain-item").forEach((it) => {
+      const on = pick[it.dataset.group] === it.dataset.value;
+      it.classList.toggle("selected", on);
+      if (on) it.setAttribute("aria-current", "true"); else it.removeAttribute("aria-current");
+    });
   }
 
   function settings() {
@@ -127,7 +138,7 @@
     }
     ui.status = s;
     const ok = s.real_store.available;
-    $("store-pill").textContent = ok ? "Real model ready" : "Real model not configured: synthetic demo only";
+    $("store-pill").textContent = ok ? "Qwen ready" : "Qwen not configured: tiny model only";
     $("store-pill").className = "pill " + (ok ? "ok" : "no");
     for (const g of ["source", "cmp-source"]) {
       const real = document.querySelector(`.segmented button[data-group="${g}"][data-value="real"]`);
@@ -136,7 +147,7 @@
     }
     $("max-seq").textContent = s.limits.max_seq;
     setKV($("system-details"), [
-      ["Real model store", ok ? s.real_store.path : "not available"],
+      ["Qwen model store", ok ? s.real_store.path : "not available"],
       ...(ok ? [] : [["How to set it up", s.real_store.problem]]),
       ["OpenBLAS / numba threads", `${s.threads.openblas} / ${s.threads.numba}`],
       ["System RAM", `${fmt(s.memory.system_available_gb)} GB free of ${fmt(s.memory.system_total_gb)} GB`],
@@ -173,12 +184,15 @@
 
   async function startRun() {
     setError("run-error", "");
-    const r = { requestId: null, text: "", synthetic: pick.source === "synthetic", decodeTime: 0, decodeTokens: 0, phase: null, done: null };
+    const r = { requestId: null, text: "", synthetic: pick.source === "synthetic", decodeTime: 0, decodeTokens: 0, phase: null,
+                done: null, start: null, budget: [], steps: [] };
     ui.run = r;
     ["m-ttft", "m-decode", "m-mem"].forEach((id) => { $(id).textContent = "—"; });
     $("run-answer").textContent = "";
     $("run-answer").appendChild(el("span", "Waiting for the first token…", "placeholder"));
     setKV($("run-details"), []);
+    $("run-details-empty").hidden = false; $("download-run").disabled = true;
+    $("run-confirm").hidden = true; $("run-confirm").textContent = "";
     $("budget-card").hidden = true; $("budget-msg").textContent = ""; $("budget-cache").textContent = "Cache: —";
     setState("run-state", "Starting…", "busy");
     $("run").disabled = true; $("compare").disabled = true;
@@ -213,6 +227,10 @@
       if (ev.live_budget) { $("budget-card").hidden = false; }
       if (ev.cache) $("budget-cache").textContent = `Cache: ${ev.cache.slots} experts (${fmt(ev.cache.gb)} GB)`;
       r.start = ev;
+      $("run-confirm").textContent = `Live engine run · ${SOURCE_SHORT[ev.source]} · ${MODE_SHORT[ev.mode]}` +
+        (ev.source === "synthetic" ? " · meaningless output" : "");
+      $("run-confirm").hidden = false;
+      showRunDetails(r);
       return;
     }
     if (ev.type === "phase") { r.phase = ev.phase; if (!r.cancelling) setState("run-state", "Reading the prompt (prefill)…", "busy"); return; }
@@ -224,10 +242,12 @@
       $("m-mem").textContent = fmt(ev.memory.private_gb, 2) + " GB";
       if (ev.cache) $("budget-cache").textContent = `Cache: ${ev.cache.slots} experts (${fmt(ev.cache.gb)} GB)`;
       r.text += ev.text;
+      r.steps.push({ index: ev.index, step_s: ev.step_s, private_gb: ev.memory.private_gb, cache_slots: ev.cache ? ev.cache.slots : null });
       renderMath($("run-answer"), r.text, r.synthetic);
       return;
     }
     if (ev.type === "budget") {
+      r.budget.push(ev.event);
       const b = ev.event;
       $("budget-msg").textContent = `Applied at token ${b.token}: ${b.slots_before} → ${b.slots_after} experts (${b.reason})`;
       return;
@@ -244,21 +264,65 @@
       if (ev.stop_reason === "cancelled" && ev.cancel_delay_s !== null) text += ` (took ${fmt(ev.cancel_delay_s, 1)} s, during ${ev.cancel_phase})`;
       setState("run-state", text, kind);
       if (ev.error) setError("run-error", ev.error);
-      const t = ev.totals;
-      setKV($("run-details"), [
-        ["Source / mode", `${ev.source === "synthetic" ? "Synthetic demo (random weights)" : "Real model"}, ${ev.mode === "cached" ? "cached + prefetch" : "memory-mapped"}`],
-        ["Model load", ev.model_reused ? "reused (already loaded)" : `${fmt(ev.load_seconds, 1)} s`],
-        ["Tokens", `${ev.prompt_tokens} prompt, ${ev.output_tokens} output; stop: ${ev.stop_reason}`],
-        ["Total time", `${fmt(ev.total_seconds, 1)} s`],
-        ["Peak memory (sampled every 0.1 s)", `private ${fmt(ev.memory.peak_private_gb)} GB, working set ${fmt(ev.memory.peak_working_set_gb)} GB`],
-        ...(ev.cache_at_start ? [["Expert cache", `${ev.cache_at_start.slots} → ${ev.cache_at_end.slots} experts; ` +
-          (ev.cache_at_start.cached_experts ? `${ev.cache_at_start.cached_experts} were still loaded from an earlier run (warm)` : "started empty")]] : []),
-        ["Experts used / cache hits / prefetch hits / blocking reads", `${t.expert_loads} / ${t.cache_hits} / ${t.prefetch_hits} / ${t.demand_reads}`],
-      ]);
+      showRunDetails(r);
+      $("download-run").disabled = false;
       return;
     }
     if (ev.type === "error") { setError("run-error", ev.message); setState("run-state", "Error", "failed"); }
   }
+
+  function showRunDetails(r) {
+    const s = r.start, d = r.done;
+    if (!s) return;
+    $("run-details-empty").hidden = true;
+    const rows = [
+      ["Request ID", s.request_id],
+      ["Prompt (as submitted)", s.prompt],
+      ["Model", SOURCE_LONG[s.source]],
+      ["Execution", MODE_LONG[s.mode]],
+      ["Settings", `max ${s.max_new_tokens} new tokens, context ${s.max_seq}` +
+        (s.source === "real" ? `, budget ${s.budget_gb} GB, starting cache ${s.start_cache_gb} GB` : "")],
+      ["Decoding", s.decoding],
+      ["Threads (OpenBLAS / numba)", `${s.threads.openblas} / ${s.threads.numba}`],
+      ["Model load", s.model_reused ? "reused (already loaded)" : `${fmt(s.load_seconds, 1)} s`],
+    ];
+    if (d) {
+      const t = d.totals;
+      rows.push(
+        ["Generated tokens", `${d.output_tokens} (prompt ${d.prompt_tokens} tokens)`],
+        ["Stop reason", d.stop_reason + (d.error ? `: ${d.error}` : "") +
+          (d.stop_reason === "cancelled" && d.cancel_delay_s !== null ? ` (took ${fmt(d.cancel_delay_s, 1)} s, during ${d.cancel_phase})` : "")],
+        ["First token / decode / total", `${fmt(d.time_to_first_token_s, 2)} s / ${fmt(d.decode_tokens_per_s, 2)} tok/s / ${fmt(d.total_seconds, 1)} s`],
+        ["Peak memory (sampled every 0.1 s)", `private ${fmt(d.memory.peak_private_gb)} GB, working set ${fmt(d.memory.peak_working_set_gb)} GB`],
+      );
+      if (d.cache_at_start) rows.push(["Expert cache", `${d.cache_at_start.slots} → ${d.cache_at_end.slots} experts; ` +
+        (d.cache_at_start.cached_experts ? `${d.cache_at_start.cached_experts} were still loaded from an earlier run (warm)` : "started empty")]);
+      for (const b of r.budget) rows.push(["Budget change", `${b.budget_gb} GB at token ${b.token}: ${b.slots_before} → ${b.slots_after} experts`]);
+      rows.push(["Experts used / cache hits / prefetch hits / blocking reads", `${t.expert_loads} / ${t.cache_hits} / ${t.prefetch_hits} / ${t.demand_reads}`]);
+    }
+    setKV($("run-details"), rows);
+  }
+
+  $("download-run").addEventListener("click", () => {
+    const r = ui.run;
+    if (!r || !r.start || !r.done) return;
+    const record = {
+      kind: "leanmoe-dashboard-run",
+      note: "Live run on this computer, as reported by the LeanMoE server. Model output is unverified.",
+      downloaded_at: new Date().toISOString(),
+      request: r.start,
+      budget_events: r.budget,
+      per_token: r.steps,
+      result: r.done,
+    };
+    const blob = new Blob([JSON.stringify(record, null, 1)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `leanmoe-run-${r.start.request_id.slice(0, 8)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  });
 
   async function cancel(which) {
     const r = which === "run" ? ui.run : ui.cmp;
@@ -281,7 +345,7 @@
 
   // ------------------------------------------------------------ Compare tab
 
-  const MODE_NAME = { cached: "Cached", mmap: "Memory-mapped" };
+  const MODE_NAME = { cached: "LeanMoE", mmap: "Windows paging" };
   function stepState(run, text, cls) {
     const li = document.querySelector(`#cmp-steps li[data-run="${run}"]`);
     li.querySelector(".step-state").textContent = text;
@@ -300,6 +364,7 @@
       const box = card.querySelector(".answer-text"); box.textContent = ""; box.appendChild(el("span", "Waiting…", "placeholder"));
     }
     $("cmp-match").hidden = true; setKV($("cmp-details"), []);
+    $("cmp-confirm").hidden = true; $("cmp-confirm").textContent = "";
     setState("cmp-state", "Starting…", "busy");
     $("compare").disabled = true; $("run").disabled = true;
     let resp;
@@ -327,7 +392,13 @@
   function onCompareEvent(ev) {
     const c = ui.cmp, run = ev.run;
     if (ev.type === "accepted") { c.requestId = ev.request_id; setState("cmp-state", "Running both modes, one after the other…", "busy"); return; }
-    if (ev.type === "start") { c.text[run] = ""; c.decode[run] = { t: 0, n: 0 }; stepState(run, "Loading model…", "active"); return; }
+    if (ev.type === "start") {
+      c.text[run] = ""; c.decode[run] = { t: 0, n: 0 }; stepState(run, "Loading model…", "active");
+      $("cmp-confirm").textContent = `Live engine run · ${SOURCE_SHORT[ev.source]} · now ${MODE_SHORT[ev.mode]}` +
+        (ev.source === "synthetic" ? " · meaningless output" : "");
+      $("cmp-confirm").hidden = false;
+      return;
+    }
     if (ev.type === "phase") { stepState(run, "Prefill…", "active"); return; }
     if (ev.type === "token") {
       stepState(run, `Generating (${ev.index + 1} tokens)`, "active");
@@ -356,6 +427,8 @@
       else if (ev.token_ids_identical) { m.className = "match same"; m.textContent = "Same tokens in both modes"; }
       else { m.className = "match diff"; m.textContent = "Different tokens in the two modes"; }
       setState("cmp-state", c.cancelling ? "Cancelled" : "Comparison complete", c.cancelling ? "cancel" : "done");
+      $("cmp-confirm").textContent = `Live engine run · ${SOURCE_SHORT[pick["cmp-source"]]} · ` +
+        ev.completed_runs.map((m) => MODE_SHORT[m]).join(", then ") + (c.synthetic ? " · meaningless output" : "");
       for (const run of ["cached", "mmap"]) if (!ev.completed_runs.includes(run)) stepState(run, "Not run");
       const rows = [];
       for (const r of ev.runs) {
@@ -377,6 +450,7 @@
   $("cmp-cancel").addEventListener("click", () => cancel("cmp"));
   const initial = location.hash.replace("#", "");
   showTab(tabs.includes(initial) ? initial : "run");
-  updateSourceBadge();
+  updateSelection();
+  if (window.matchMedia("(max-width: 860px)").matches) $("explain").open = false;
   loadStatus();
 })();

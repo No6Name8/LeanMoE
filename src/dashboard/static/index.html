@@ -34,65 +34,93 @@
     <summary>Settings</summary>
     <div class="settings-grid">
       <label>Max new tokens <input id="max-new" type="number" min="1" max="400" value="64"></label>
-      <label class="real-only">Memory budget (GB) <input id="budget" type="number" min="0.5" step="0.1" value="3.5"></label>
-      <label class="real-only">Starting cache (GB) <input id="start-cache" type="number" min="0.05" step="0.1" value="1.2"></label>
+      <label>Memory budget (GB) <input id="budget" type="number" min="0.5" step="0.1" value="3.5"></label>
+      <label>Starting cache (GB) <input id="start-cache" type="number" min="0.05" step="0.1" value="1.2"></label>
     </div>
-    <p class="hint">Used by Run and Compare. Context limit: prompt + output ≤ <span id="max-seq">512</span> tokens.</p>
+    <p class="hint">Used by Run and Compare. Budget and cache apply to Qwen with LeanMoE. Context limit: prompt + output ≤ <span id="max-seq">512</span> tokens.</p>
   </details>
 
   <!-- ============================== RUN ============================== -->
-  <section id="panel-run" role="tabpanel" aria-labelledby="tab-run" class="tabpanel">
-    <div class="card">
-      <label class="field-label" for="run-prompt">Prompt</label>
-      <textarea id="run-prompt" rows="3" maxlength="4000">Solve $x^2 - 5x + 6 = 0$.</textarea>
-      <div class="controls">
-        <div class="segmented" role="radiogroup" aria-label="Model">
-          <button type="button" role="radio" data-group="source" data-value="real" aria-checked="true">Real model</button>
-          <button type="button" role="radio" data-group="source" data-value="synthetic" aria-checked="false">Synthetic demo</button>
+  <section id="panel-run" role="tabpanel" aria-labelledby="tab-run" class="tabpanel" hidden>
+    <div class="run-layout">
+      <div class="area-controls card">
+        <label class="field-label" for="run-prompt">Prompt</label>
+        <textarea id="run-prompt" rows="3" maxlength="4000">Solve $x^2 - 5x + 6 = 0$.</textarea>
+        <div class="choice">
+          <span class="choice-label">Model</span>
+          <div class="segmented" role="radiogroup" aria-label="Model">
+            <button type="button" role="radio" data-group="source" data-value="real" aria-checked="true">Qwen — real model</button>
+            <button type="button" role="radio" data-group="source" data-value="synthetic" aria-checked="false">Tiny model — engine test</button>
+          </div>
         </div>
-        <div class="segmented" role="radiogroup" aria-label="Mode">
-          <button type="button" role="radio" data-group="mode" data-value="cached" aria-checked="true">Cached</button>
-          <button type="button" role="radio" data-group="mode" data-value="mmap" aria-checked="false">Memory-mapped</button>
+        <div class="choice">
+          <span class="choice-label">Execution</span>
+          <div class="segmented" role="radiogroup" aria-label="Execution">
+            <button type="button" role="radio" data-group="mode" data-value="cached" aria-checked="true">LeanMoE — cache + prefetch</button>
+            <button type="button" role="radio" data-group="mode" data-value="mmap" aria-checked="false">Baseline — Windows paging</button>
+          </div>
         </div>
-        <div class="actions">
-          <button type="button" id="run" class="primary">Run</button>
-          <button type="button" id="run-cancel" class="ghost" disabled>Cancel</button>
+        <div class="controls">
+          <span id="run-selection" class="selection">Model: Qwen · Method: LeanMoE</span>
+          <div class="actions">
+            <button type="button" id="run" class="primary">Run</button>
+            <button type="button" id="run-cancel" class="ghost" disabled>Cancel</button>
+          </div>
         </div>
+        <div class="statusline"><span id="run-state" class="state idle">Idle</span><span id="run-confirm" class="confirm" hidden></span><span id="run-error" class="error" role="alert"></span></div>
       </div>
-      <div class="statusline"><span id="run-state" class="state idle">Idle</span><span id="run-error" class="error" role="alert"></span></div>
-    </div>
 
-    <div class="card budget-card" id="budget-card" hidden>
-      <div class="budget-head"><strong>Memory budget</strong><span class="badge live">Live</span></div>
-      <div class="budget-row">
-        <input id="live-budget" type="range" min="1.5" max="4.0" step="0.1" value="2.5" aria-label="Memory budget in GB">
-        <output id="live-budget-value" for="live-budget">2.5 GB</output>
-        <button type="button" id="apply-budget" class="primary small">Apply</button>
+      <details class="area-aside explain" id="explain" open>
+        <summary>What am I running?</summary>
+        <p class="explain-lead">The model supplies the answers; the execution method decides how its weights reach memory.</p>
+        <div class="explain-group">
+          <span class="explain-head">Model</span>
+          <div class="explain-item" data-group="source" data-value="real"><strong>Qwen</strong> The real pretrained model (Qwen1.5-MoE-A2.7B-Chat, int8) generating answers on this machine.</div>
+          <div class="explain-item" data-group="source" data-value="synthetic"><strong>Tiny model</strong> Random weights for testing engine behaviour without the large download; its output is meaningless.</div>
+        </div>
+        <div class="explain-group">
+          <span class="explain-head">Execution</span>
+          <div class="explain-item" data-group="mode" data-value="cached"><strong>LeanMoE</strong> Our ExpertRelay-derived method: caches experts in RAM and prefetches likely upcoming experts.</div>
+          <div class="explain-item" data-group="mode" data-value="mmap"><strong>Windows paging</strong> The baseline: memory-mapped expert files, without our expert cache or prefetch.</div>
+        </div>
+      </details>
+
+      <div class="area-rest">
+        <div class="card budget-card" id="budget-card" hidden>
+          <div class="budget-head"><strong>Memory budget</strong><span class="badge live">Live</span></div>
+          <div class="budget-row">
+            <input id="live-budget" type="range" min="1.5" max="4.0" step="0.1" value="2.5" aria-label="Memory budget in GB">
+            <output id="live-budget-value" for="live-budget">2.5 GB</output>
+            <button type="button" id="apply-budget" class="primary small">Apply</button>
+          </div>
+          <div class="budget-status"><span id="budget-cache">Cache: —</span><span id="budget-msg"></span></div>
+        </div>
+
+        <div class="metrics" aria-label="Live measurements">
+          <div class="metric"><span class="metric-label">First token</span><span class="metric-value" id="m-ttft">—</span></div>
+          <div class="metric"><span class="metric-label">Decode speed</span><span class="metric-value" id="m-decode">—</span></div>
+          <div class="metric"><span class="metric-label">Private memory</span><span class="metric-value" id="m-mem">—</span></div>
+        </div>
+        <p class="hint center"><span class="badge live">Live</span> measured now on this computer</p>
+
+        <div class="card answer" id="run-answer-card">
+          <div class="answer-head">
+            <strong>Answer</strong>
+            <span id="run-source-badge" class="badge">Qwen</span>
+            <span class="badge warn">Unverified</span>
+          </div>
+          <div id="run-answer" class="answer-text" aria-live="polite"><span class="placeholder">The answer streams here.</span></div>
+        </div>
+
+        <details class="details" id="run-details-panel">
+          <summary>Run details</summary>
+          <p id="run-details-empty" class="hint">Details appear after a run starts.</p>
+          <dl id="run-details" class="kv"></dl>
+          <p><button type="button" id="download-run" class="link-button" disabled>Download this run record (JSON)</button></p>
+          <p class="hint">First token: the prompt's first forward pass (prefill). Decode speed: tokens after the first ÷ their forward-pass time. Private memory: committed by this process; working set: in physical RAM. Peaks are sampled every 0.1 s and can miss shorter spikes. The budget is a target the engine plans against, not an enforced limit. Model output is shown exactly as generated and has not been checked or corrected.</p>
+        </details>
       </div>
-      <div class="budget-status"><span id="budget-cache">Cache: —</span><span id="budget-msg"></span></div>
     </div>
-
-    <div class="metrics" aria-label="Live measurements">
-      <div class="metric"><span class="metric-label">First token</span><span class="metric-value" id="m-ttft">—</span></div>
-      <div class="metric"><span class="metric-label">Decode speed</span><span class="metric-value" id="m-decode">—</span></div>
-      <div class="metric"><span class="metric-label">Private memory</span><span class="metric-value" id="m-mem">—</span></div>
-    </div>
-    <p class="hint center"><span class="badge live">Live</span> measured now on this computer</p>
-
-    <div class="card answer" id="run-answer-card">
-      <div class="answer-head">
-        <strong>Answer</strong>
-        <span id="run-source-badge" class="badge">Real model</span>
-        <span class="badge warn">Unverified</span>
-      </div>
-      <div id="run-answer" class="answer-text" aria-live="polite"><span class="placeholder">The answer streams here.</span></div>
-    </div>
-
-    <details class="details">
-      <summary>Run details</summary>
-      <dl id="run-details" class="kv"></dl>
-      <p class="hint">First token: the prompt's first forward pass (prefill). Decode speed: tokens after the first ÷ their forward-pass time. Private memory: committed by this process; working set: in physical RAM. Peaks are sampled every 0.1 s and can miss shorter spikes. The budget is a target the engine plans against, not an enforced limit. Model output is shown exactly as generated and has not been checked or corrected. Synthetic runs use random weights: their token ids are meaningless.</p>
-    </details>
   </section>
 
   <!-- ============================== COMPARE ============================== -->
@@ -100,20 +128,24 @@
     <div class="card">
       <label class="field-label" for="cmp-prompt">Prompt</label>
       <textarea id="cmp-prompt" rows="3" maxlength="4000">What is the capital of France? Answer in one sentence.</textarea>
-      <div class="controls">
+      <div class="choice">
+        <span class="choice-label">Model</span>
         <div class="segmented" role="radiogroup" aria-label="Model for comparison">
-          <button type="button" role="radio" data-group="cmp-source" data-value="real" aria-checked="true">Real model</button>
-          <button type="button" role="radio" data-group="cmp-source" data-value="synthetic" aria-checked="false">Synthetic demo</button>
+          <button type="button" role="radio" data-group="cmp-source" data-value="real" aria-checked="true">Qwen — real model</button>
+          <button type="button" role="radio" data-group="cmp-source" data-value="synthetic" aria-checked="false">Tiny model — engine test</button>
         </div>
+      </div>
+      <div class="controls">
+        <span class="selection">Runs LeanMoE, then Windows paging, with the same prompt and settings</span>
         <div class="actions">
           <button type="button" id="compare" class="primary">Compare modes</button>
           <button type="button" id="cmp-cancel" class="ghost" disabled>Cancel</button>
         </div>
       </div>
-      <div class="statusline"><span id="cmp-state" class="state idle">Idle</span><span id="cmp-error" class="error" role="alert"></span></div>
+      <div class="statusline"><span id="cmp-state" class="state idle">Idle</span><span id="cmp-confirm" class="confirm" hidden></span><span id="cmp-error" class="error" role="alert"></span></div>
       <ol class="steps" id="cmp-steps">
-        <li data-run="cached"><span class="step-name">Cached</span> <span class="step-state">Waiting</span></li>
-        <li data-run="mmap"><span class="step-name">Memory-mapped</span> <span class="step-state">Waiting</span></li>
+        <li data-run="cached"><span class="step-name">LeanMoE</span> <span class="step-state">Waiting</span></li>
+        <li data-run="mmap"><span class="step-name">Windows paging</span> <span class="step-state">Waiting</span></li>
       </ol>
     </div>
 
@@ -121,12 +153,12 @@
 
     <div class="side-by-side">
       <div class="card answer" data-run="cached">
-        <div class="answer-head"><strong>Cached</strong><span class="badge live">Live</span><span class="badge warn">Unverified</span></div>
+        <div class="answer-head"><strong>LeanMoE — cache + prefetch</strong><span class="badge live">Live</span><span class="badge warn">Unverified</span></div>
         <div class="mini-metrics"><span>First token <b class="v-ttft">—</b></span><span>Decode <b class="v-decode">—</b></span><span>Private peak <b class="v-mem">—</b></span></div>
         <div class="answer-text"><span class="placeholder">Not run yet.</span></div>
       </div>
       <div class="card answer" data-run="mmap">
-        <div class="answer-head"><strong>Memory-mapped</strong><span class="badge live">Live</span><span class="badge warn">Unverified</span></div>
+        <div class="answer-head"><strong>Baseline — Windows paging</strong><span class="badge live">Live</span><span class="badge warn">Unverified</span></div>
         <div class="mini-metrics"><span>First token <b class="v-ttft">—</b></span><span>Decode <b class="v-decode">—</b></span><span>Private peak <b class="v-mem">—</b></span></div>
         <div class="answer-text"><span class="placeholder">Not run yet.</span></div>
       </div>
@@ -135,7 +167,7 @@
     <details class="details">
       <summary>Comparison details and limits</summary>
       <dl id="cmp-details" class="kv"></dl>
-      <p class="hint">One run of each mode, one after the other, each from a fresh model load, with the same prompt and settings. Memory-mapped speed depends on what Windows already has in its file cache, so earlier runs and the order affect it; a single comparison is not a benchmark. Memory-mapping keeps weights in the file cache, so its private memory is low while its working set (physical RAM) can be high. The recorded benchmark on the Evidence tab used repeated, alternating runs.</p>
+      <p class="hint">One run of each method, one after the other, each from a fresh model load, with the same prompt and settings. Windows-paging speed depends on what Windows already has in its file cache, so earlier runs and the order affect it; a single comparison is not a benchmark. Paging keeps weights in the file cache, so its private memory is low while its working set (physical RAM) can be high. The recorded benchmark on the Evidence tab used repeated, alternating runs.</p>
     </details>
   </section>
 

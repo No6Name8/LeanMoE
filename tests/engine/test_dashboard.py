@@ -315,3 +315,17 @@ def test_refuses_a_port_another_program_is_using(tmp_path):
             serve(other.getsockname()[1], models_root=tmp_path)
     finally:
         other.close()
+
+
+def test_start_event_echoes_the_request_without_local_paths(server):
+    _, engine = server
+    _, events = stream(server, "/api/generate", body(prompt="Solve $x^2 = 4$."))
+    start = [e for e in events if e["type"] == "start"][0]
+    accepted = events[0]
+    assert start["request_id"] == accepted["request_id"]
+    assert start["prompt"] == "Solve $x^2 = 4$." and start["max_new_tokens"] == 12
+    assert start["source"] == "synthetic" and start["mode"] == "cached" and "decoding" in start
+    assert set(start["threads"]) == {"openblas", "numba"}
+    everything = json.dumps(events)
+    for path in (str(engine.store_dir), str(engine.synthetic_dir()), str(engine.store_dir.parent)):
+        assert path not in everything and path.replace("\\", "\\\\") not in everything
