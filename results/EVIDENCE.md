@@ -81,6 +81,23 @@ Same three prompts as the prefetch experiment, 48 new tokens, greedy, adaptive p
 - Memory-mapped runs read 0.97 to 1.24 GB per decode token from disk in the first round and 0.29 to 0.70 GB in the second, as the Windows file cache warmed between runs; the one memory-mapped run faster than its cached partner (fact, 2.056 tok/s) read 0.29 GB per token. Processes were fresh, but the system file cache was never cleared.
 - Token ids identical across both modes for every prompt.
 
+## Capability audit (`eval/capability_audit.py`)
+
+`capability_audit_20261030-064849.json`: eight fixed prompts answered by the real Chat model in one process, one after another, greedy decoding, stopping at the model's end-of-turn token or after 320 new tokens (the script's own loop; the engine's `generate()` has no end-of-sequence stop). 1.0 GB fixed cache, prefetch on. **This run used 12 OpenBLAS threads**: the script imported numpy before the engine package, so the engine's 4-thread default did not apply (fixed in the script afterwards; the file records the effective count). Expected answers were worked out independently.
+
+| Prompt | Result |
+|---|---|
+| 487 x 36 | Correct (17532) |
+| 3x + 7 = 2x - 5 | Correct (x = -12) |
+| x^2 - 5x + 6 = 0 | **Wrong**: factored with -6 and 1, answered x = 6 or x = -1 (correct: 2 and 3) |
+| Train, 180 km at 72 km/h from 2:15 pm | Correct (4:45 pm) |
+| Integral of 3x^2 + 2x from 0 to 1, LaTeX input | Correct value (2), sloppy "+ C" steps, cut off at the 320-token limit |
+| Python Fibonacci with a loop | Loop works for its own indexing (F(1) = 0); returns a string for invalid input; its example claims fib(20) = 6765, wrong for that indexing (4181); cut off at the limit |
+| Arabic: capital of Japan | Right fact, broken language ("الcapital of Japan is Tokyo.") |
+| Passage arithmetic (books at end of 2018) | **Wrong**: said it can't be determined (correct: 18,500) |
+
+Time to first token 10.6 to 24.7 s and decode 1.72 to 1.95 tokens/s (12 threads). Private memory returned to 3.094 to 3.095 GB before each request and peaked at 3.346 to 3.347 GB during each: no growth over the eight sequential requests. These are model answers on a handful of prompts, not a benchmark of the model's quality.
+
 ## Not measured here
 
 No comparison with a fully cold file cache (the system cache was never cleared), with other prompts or lengths, or on another machine. ExpertRelay's historical results live in that private repository and are not reproduced here.

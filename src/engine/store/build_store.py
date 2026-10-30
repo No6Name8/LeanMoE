@@ -42,11 +42,10 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from src.engine import REPO_ROOT
 from src.engine.benchmarking import append_benchmark_record, base_record, peak_process_rss_mb
 from src.engine.manager.profile import collect_machine_profile
 from src.engine.memory_budget import enforce_ram_budget
-from src.engine.paths import BENCHMARK_RESULTS_DIR, DEFAULT_EXPERT_STORE_DIR
+from src.engine.paths import DEFAULT_EXPERT_STORE_DIR
 from src.engine.store.expert_reader import EXPERTS_BIN, EXPERTS_INDEX, ExpertStoreReader
 from src.engine.store.fetch_hf_tensors import (
     TensorLocation,
@@ -83,7 +82,11 @@ MANIFEST = "store.json"
 RESIDENT_BIN = "resident.bin"
 RESIDENT_INDEX = "resident_index.json"
 JOURNAL = "build_journal.jsonl"
-EXPERT_STORE_DOC = REPO_ROOT / "docs" / "expert-store.md"
+# LeanMoE change: the report and the build record are written into the store
+# directory. ExpertRelay wrote them to docs/ (absent here) and to the benchmark
+# results folder (LeanMoE's committed evidence) under the machine's hostname.
+EXPERT_STORE_DOC_NAME = "expert-store.md"
+BUILD_RECORD_NAME = "build_record.json"
 
 # Largest block of a resident tensor fetched and quantized at once: 4M
 # elements = 8 MB of bf16 on the wire, 16 MB as fp32. Expert matrices
@@ -572,12 +575,12 @@ def build(store_dir: Path, repo_id: str, revision: str | None, workers: int, max
 
     done_experts, done_resident, _ = verified_journal(store_dir, read_journal(store_dir / JOURNAL))
     summary = finalize(plan, store_dir, manifest, done_experts, done_resident)
-    _save_build_record(plan, workers, summary)
+    _save_build_record(plan, workers, summary, store_dir)
     print(json.dumps(summary, indent=1))
     return 0
 
 
-def _save_build_record(plan: Plan, workers: int, summary: dict) -> None:
+def _save_build_record(plan: Plan, workers: int, summary: dict, store_dir: Path) -> None:
     record = base_record(
         label="expert store build",
         seed=0,
@@ -590,7 +593,7 @@ def _save_build_record(plan: Plan, workers: int, summary: dict) -> None:
         machine=collect_machine_profile(measure_disk=False),
         summary=summary,
     )
-    append_benchmark_record(BENCHMARK_RESULTS_DIR / f"expert_store_build_{socket.gethostname()}.json", record)
+    append_benchmark_record(Path(store_dir) / BUILD_RECORD_NAME, record)
 
 
 def _gb(n: int) -> str:
@@ -713,7 +716,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--max-ram-gb", type=float, default=1.5)
     ap.add_argument("--verify", action="store_true", help="only re-check every sha256 of a finished store")
     ap.add_argument(
-        "--report", action="store_true", help="only (re)generate docs/expert-store.md from store.json"
+        "--report", action="store_true", help="only (re)generate expert-store.md in the store directory from store.json"
     )
     return ap
 
@@ -722,8 +725,9 @@ def main() -> None:
     args = build_arg_parser().parse_args()
     if args.report:
         manifest = json.loads((args.store_dir / MANIFEST).read_text())
-        EXPERT_STORE_DOC.write_text(format_store_report(manifest))
-        print(f"wrote {EXPERT_STORE_DOC}")
+        doc = args.store_dir / EXPERT_STORE_DOC_NAME
+        doc.write_text(format_store_report(manifest))
+        print(f"wrote {doc}")
         return
     if args.verify:
         result = verify_store(args.store_dir)

@@ -1,0 +1,3 @@
+# Optional: only src/synthetic_moe.py (the toy fallback) uses torch. Large download.
+-r requirements.txt
+torch>=2.5

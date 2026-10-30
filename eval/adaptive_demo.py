@@ -29,7 +29,7 @@ The budget file is written from this process at a token boundary. LiveBudget
 only ever looks at the file between tokens, so a write from another process
 at any moment during token N would take effect at the same point.
 
-    set LEANMOE_MODELS_ROOT=C:\\Users\\h\\Documents\\ExpertRelay\\models
+    set LEANMOE_MODELS_ROOT=C:\\path\\to\\models
     python -m eval.adaptive_demo
 """
 

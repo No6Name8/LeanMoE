@@ -4,6 +4,76 @@ A mixture-of-experts (MoE) model only uses a few of its experts for each token, 
 
 This submission evaluates that design on the real model, including an **adaptive memory budget**: the budget is cut while the model is generating, the expert cache shrinks between tokens, and generation continues with the same output.
 
+## Start here
+
+**Supported:** Windows 10 or 11, 64-bit, with Python 3.13 (tested on Windows 11 with Python 3.13.14; Python 3.10 to 3.12 may work but are untested). Linux and macOS are not supported: the engine reads expert weights with Windows-only unbuffered file I/O, so on those systems the engine tests are skipped (skipped is not passed) and only the saved-evidence checker runs. You also need Git and an internet connection for the package install.
+
+There is **no web dashboard yet**; everything runs from the command line.
+
+### Path 1: quick verification (no model download)
+
+Runs the actual engine on a tiny synthetic model that the tests generate, and checks the recorded real-model results. It does not run the real model. Copy into Windows PowerShell:
+
+```
+git clone https://github.com/No6Name8/LeanMoE.git
+cd LeanMoE
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe eval\compare_artifacts.py results\adaptive_demo_20261030-060626.json results\adaptive_demo_20261030-060728.json
+```
+
+What each step does and what success looks like:
+
+- **`setup.ps1`** creates `.venv` inside the repository, installs the packages in `requirements-dev.txt` (numpy, numba, psutil, tokenizers, jinja2, pytest) and runs the preflight check. It ends with `Setup complete.` It is safe to rerun, downloads no model files and changes no system settings (`-ExecutionPolicy Bypass` applies to that one PowerShell process only). Measured time on a clean clone: not yet measured.
+- **`pytest`** runs 103 tests and should end with `103 passed`. 63 of them are ExpertRelay's engine tests: each builds a tiny random-weight model and expert store in a temporary folder and runs the real engine on it, covering cache resizing, the live memory budget shrinking and growing mid-generation, and bit-identical output across expert sources, cache sizes and prefetch settings. The other 40 test the evidence checker and the memory-accounting baseline. These show the engine's mechanisms behave as specified on a synthetic model; they say nothing about the real model's quality or speed. Any `failed` or `skipped` count means that part was not verified. Measured time: not yet measured.
+- **`compare_artifacts.py`** reads two committed result files from real-model runs and should print `PASS: identical generated token ids (80 tokens) ...`. It checks the **recorded** evidence; it does not rerun the real model.
+
+The preflight check can be rerun at any time: `.\.venv\Scripts\python.exe scripts\preflight.py`. Passing it does not guarantee a real-model run will fit in memory.
+
+### Path 2: the full model (large download, not yet reproduced from this repository)
+
+What you need in addition:
+
+- **The Qwen1.5-MoE-A2.7B-Chat int8 store**: 14.36 GB, plus about 1 GB of free space for margin. It is not in this repository and there is no prebuilt download yet.
+- **Memory:** developed on an 8 GB laptop. At the demo defaults the process's sampled private memory peaked at 3.18 GB, so Windows commit headroom should be comfortably above that; more free physical RAM gives a larger cache and less paging.
+- **Time:** each demo run takes about two minutes on the development laptop.
+
+**Getting the store (NOT YET VERIFIED in LeanMoE).** The store builder from ExpertRelay is included (`src/engine/store/build_store.py`). It streams the original bf16 checkpoint from Hugging Face (`Qwen/Qwen1.5-MoE-A2.7B-Chat`, revision `ec052fda178e241c7c443468d2fa1db6618996be`) with HTTP range requests, quantizes it to int8 and writes the store; it doesn't keep the 28.6 GB checkpoint on disk. When ExpertRelay built this exact store, the build read 28.6 GB over the network, took 6 h 16 min and peaked at 490 MB of RAM. It resumes if rerun after an interruption. These commands have not been run from LeanMoE:
+
+```
+$env:LEANMOE_MODELS_ROOT = "D:\leanmoe-models"
+.\.venv\Scripts\python.exe -m src.engine.store.build_store --repo-id Qwen/Qwen1.5-MoE-A2.7B-Chat --revision ec052fda178e241c7c443468d2fa1db6618996be --store-dir "$env:LEANMOE_MODELS_ROOT\qwen1.5-moe-a2.7b-chat-int8"
+.\.venv\Scripts\python.exe -m src.engine.store.build_store --verify --store-dir "$env:LEANMOE_MODELS_ROOT\qwen1.5-moe-a2.7b-chat-int8"
+```
+
+Replace `D:\leanmoe-models` with any folder on a drive with enough space. The model is under the Tongyi Qianwen license (redistribution of derivatives is allowed with conditions, including shipping the license and notices); see the model's LICENSE on Hugging Face. The tokenizer files are fetched from Hugging Face on the first real-model run if they aren't in the store.
+
+**Running the real model** (verified on the development laptop with an existing store):
+
+```
+$env:LEANMOE_MODELS_ROOT = "D:\leanmoe-models"
+.\.venv\Scripts\python.exe scripts\preflight.py --require-model
+.\.venv\Scripts\python.exe -m eval.adaptive_demo --cut-at 0
+.\.venv\Scripts\python.exe -m eval.adaptive_demo --cut-at 20
+.\.venv\Scripts\python.exe -m eval.adaptive_demo --compare results\<uncut run>.json results\<cut run>.json
+```
+
+Each run writes a new `results\adaptive_demo_<timestamp>.json`. **To stop a run**, press Ctrl+C; it stops at the next point Python can interrupt, which during the prompt's first pass can take several seconds, and that run's result file is not written. The experiments behind the results below are `eval\prefetch_ablation.py` and `eval\config_compare.py` (about 15 to 20 minutes each; see their `--help`).
+
+### Common errors
+
+| Message | Fix |
+|---|---|
+| `running scripts is disabled on this system` | Run the setup line exactly as shown: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1`. |
+| `No Python 3.10-3.13 found` | Install Python 3.13 from python.org (with the `py` launcher or "Add python.exe to PATH"), then rerun setup. |
+| pytest shows `skipped` | The engine tests only run on Windows. Skipped tests are not verified. |
+| `no model store at ...` or preflight says `NOT AVAILABLE` | Set `$env:LEANMOE_MODELS_ROOT` to the folder that contains `qwen1.5-moe-a2.7b-chat-int8`. |
+| `MemoryBudgetExceeded` | The startup memory guard refused the configuration. Lower `--start-gb` and `--start-cache-gb`. Each demo run also shows one deliberate refusal (the oversized fixed-cache example); that one is expected. |
+| `MemoryError` or `Unable to allocate` | Windows ran out of commit headroom. Close other programs and check preflight's commit figure. |
+| A path-length error while installing `torch` | Only the optional toy needs torch (`-WithToy`). Clone into a short folder such as `C:\LeanMoE`. |
+
+**Optional toy fallback.** `src/synthetic_moe.py` times disk loads against cache hits on 8 tiny toy layers. It doesn't use the engine and says nothing about real-model performance. It needs torch: run setup with `-WithToy`, then `.\.venv\Scripts\python.exe -m src.synthetic_moe`.
+
 ## Results at a glance
 
 Measured on one 8 GB Windows laptop; details and caveats below and in [results/EVIDENCE.md](results/EVIDENCE.md).
@@ -26,50 +96,6 @@ New in LeanMoE:
 - **Thread tuning:** OpenBLAS defaults to 4 threads (result 3).
 - **Comparison harnesses:** prefetch on/off (`eval/prefetch_ablation.py`) and BLAS threads and memory-mapped baseline (`eval/config_compare.py`).
 - **The measurements** in this README.
-
-## Quick start
-
-Tested on Windows with Python 3.13. Use a short directory path (or enable long paths): torch has deeply nested files and failed to install into a long path.
-
-```
-python -m venv venv
-venv\Scripts\activate
-python -m pip install -r requirements.txt
-```
-
-**Check the saved evidence (no model needed, standard library only).** This reads the committed result files; it does not rerun inference.
-
-```
-python eval/compare_artifacts.py results/adaptive_demo_20261030-060626.json results/adaptive_demo_20261030-060728.json
-python -m unittest discover -s tests -v
-```
-
-**Engine tests (no model needed, Windows).** These are ExpertRelay's own engine tests, ported with the store builder they use. Each test builds a tiny random-weight model and store in a temporary folder and runs the real engine code on it: cache resizing, the live budget changing mid-generation (shrinking to the minimum and growing back), and bit-identical output across expert sources, cache sizes and prefetch settings. They show the engine's mechanisms behave as specified on that synthetic store; they say nothing about the real model's output quality or speed. They need Windows (the unbuffered reader uses Win32) and are skipped elsewhere; a skipped test is not a passed one.
-
-```
-python -m pip install -r requirements-dev.txt
-python -m pytest
-```
-
-**Toy fallback (no model needed).** `src/synthetic_moe.py` writes 8 tiny experts to disk and times disk loads against cache hits. It is not a model, doesn't use the engine or LiveBudget, and says nothing about real-model performance.
-
-```
-python -m src.synthetic_moe
-```
-
-**Real model (needs the external store).** The Qwen1.5-MoE-A2.7B-Chat int8 store (14.36 GB) is not in this repository. The ExpertRelay store builder is included only because the engine tests use it (`src/engine/store/build_store.py`); building the real store with it hasn't been tried here and would need the original 28.6 GB bf16 checkpoint. With the store in a folder named `qwen1.5-moe-a2.7b-chat-int8` inside some directory:
-
-```
-set LEANMOE_MODELS_ROOT=C:\path\to\that\directory
-python -m eval.adaptive_demo --cut-at 0
-python -m eval.adaptive_demo --cut-at 20
-python -m eval.adaptive_demo --compare results\<uncut run>.json results\<cut run>.json
-python -m eval.prefetch_ablation --cache-gb 1.1
-python -m eval.config_compare --stage blas --prompts fact code explain
-python -m eval.config_compare --stage mmap --prompts fact code explain --blas 4
-```
-
-Each demo run takes about two minutes here; the prefetch experiment about 20 minutes and each `config_compare` stage about 15. At the demo's defaults the process's sampled private memory peaked at 3.18 GB. Check Windows commit headroom and free physical RAM before running (see [Limitations](#limitations)); lower `--start-gb`, `--start-cache-gb` and `--cut-gb` if headroom is short.
 
 ## Verified results
 
@@ -155,6 +181,8 @@ Decode was faster with the cache in 5 of 6 matched pairs: about 2 times on avera
 
 - `src/engine/` — engine ported from ExpertRelay (see above). LeanMoE's changes are marked `LeanMoE change` in the code.
 - `src/synthetic_moe.py` — toy fallback.
+- `scripts/setup.ps1` — creates `.venv`, installs dependencies, runs preflight; `scripts/preflight.py` — environment and model-store check.
+- `requirements.txt` (engine), `requirements-dev.txt` (adds pytest), `requirements-toy.txt` (adds torch for the toy only).
 - `eval/adaptive_demo.py` — budget-cut demo and the oversized fixed-cache example.
 - `eval/compare_artifacts.py` — standard-library checker for an uncut and a cut run.
 - `eval/prefetch_ablation.py` — prefetch on/off experiment.

@@ -1,9 +1,6 @@
-# src/engine (ported ExpertRelay runtime) and eval/: third-party imports found in the code
+# Engine (src/engine) and evaluation scripts (eval/): third-party imports found in the code.
 numpy>=2.2
 numba>=0.61        # fused int8 kernel; loaded lazily, the blocked int8 kernel works without it
 psutil>=7.1
 tokenizers>=0.21
 jinja2>=3.1        # chat template rendering
-
-# src/synthetic_moe.py (toy fallback) only
-torch>=2.5

@@ -1,0 +1,189 @@
+{
+ "settings": {
+  "cache_gb": 1.0,
+  "max_new_tokens": 320,
+  "max_seq": 640,
+  "decoding": "greedy argmax, stop at end-of-turn",
+  "openblas_threads": 12,
+  "cache_slots": 115,
+  "load_seconds": 4.587389799999073
+ },
+ "results": [
+  {
+   "prompt_tokens": 34,
+   "output_tokens": 19,
+   "stop": "eos",
+   "output": "The product of 487 and 36 is 17532.",
+   "time_to_first_token_s": 21.087671200046316,
+   "decode_tokens_per_s": 1.7165622062446138,
+   "total_seconds": 32.18800550000742,
+   "intermediate_texts_with_replacement_char": 0,
+   "memory_before": {
+    "private_gb": 3.033071616,
+    "working_set_gb": 1.651617792
+   },
+   "memory_after": {
+    "private_gb": 3.34626816,
+    "working_set_gb": 2.609549312
+   },
+   "kv_cache_mb": 251.65824,
+   "id": "arithmetic",
+   "prompt": "What is 487 × 36? Give the result.",
+   "expected": "17532 (487*30 = 14610, 487*6 = 2922)"
+  },
+  {
+   "prompt_tokens": 38,
+   "output_tokens": 132,
+   "stop": "eos",
+   "output": "To solve for x, we need to isolate x on one side of the equation. We can do this by subtracting 2x from both sides of the equation and then subtracting 7 from both sides:\n\n3x + 7 = 2x - 5\n\nFirst, subtract 2x from both sides:\n3x - 2x + 7 = 2x - 2x - 5\nx + 7 = -5\n\nNext, subtract 7 from both sides:\nx + 7 - 7 = -5 - 7\nx = -12\n\nSo, x = -12.",
+   "time_to_first_token_s": 12.811417000135407,
+   "decode_tokens_per_s": 1.7401653126700518,
+   "total_seconds": 88.68258920009248,
+   "intermediate_texts_with_replacement_char": 0,
+   "memory_before": {
+    "private_gb": 3.094351872,
+    "working_set_gb": 2.59362816
+   },
+   "memory_after": {
+    "private_gb": 3.346354176,
+    "working_set_gb": 2.646990848
+   },
+   "kv_cache_mb": 251.65824,
+   "id": "linear",
+   "prompt": "Solve for x: 3x + 7 = 2x - 5.",
+   "expected": "x = -12"
+  },
+  {
+   "prompt_tokens": 35,
+   "output_tokens": 238,
+   "stop": "eos",
+   "output": "To solve the quadratic equation x^2 - 5x + 6 = 0, we can factor the left-hand side of the equation.\n\nThe factors of 6 that add up to -5 are -6 and 1. Therefore, we can write the equation as:\n\nx^2 - 6x + x - 6 = 0\n\nNow, we can group the first two and last two terms:\n\n(x^2 - 6x) + (x - 6) = 0\n\nFactor out the greatest common factor (GCF) from each group:\n\nx(x - 6) + 1(x - 6) = 0\n\nNow, we can factor out the common binomial (x - 6):\n\n(x - 6)(x + 1) = 0\n\nNext, we set each factor equal to zero and solve for x:\n\nx - 6 = 0 or x + 1 = 0\n\nx = 6 or x = -1\n\nSo, the solutions to the equation x^2 - 5x + 6 = 0 are x = 6 and x = -1.",
+   "time_to_first_token_s": 10.597045900067315,
+   "decode_tokens_per_s": 1.7444100776737756,
+   "total_seconds": 147.21181400003843,
+   "intermediate_texts_with_replacement_char": 0,
+   "memory_before": {
+    "private_gb": 3.09446656,
+    "working_set_gb": 2.581774336
+   },
+   "memory_after": {
+    "private_gb": 3.346567168,
+    "working_set_gb": 2.685980672
+   },
+   "kv_cache_mb": 251.65824,
+   "id": "quadratic",
+   "prompt": "Solve x^2 - 5x + 6 = 0.",
+   "expected": "x = 2 or x = 3"
+  },
+  {
+   "prompt_tokens": 52,
+   "output_tokens": 238,
+   "stop": "eos",
+   "output": "To find the arrival time of the train, we need to calculate the time it takes for the train to travel 180 km at a constant speed of 72 km/h.\n\nFirst, we convert the departure time to hours since the speed is in km/h. 2:15 pm is 14:15 in 24-hour format.\n\nThe time taken to travel 180 km at 72 km/h is calculated as follows:\n\n\\[ \\text{Time} = \\frac{\\text{Distance}}{\\text{Speed}} \\]\n\\[ \\text{Time} = \\frac{180 \\text{ km}}{72 \\text{ km/h}} \\]\n\\[ \\text{Time} = \\frac{180}{72} \\text{ hours} \\]\n\\[ \\text{Time} = 2.5 \\text{ hours} \\]\n\nNow, we add this time to the departure time:\n\n\\[ 14:15 + 2.5 \\text{ hours} = 16:45 \\]\n\nSo, the train arrives at 4:45 pm.",
+   "time_to_first_token_s": 13.731377800228074,
+   "decode_tokens_per_s": 1.8089726053376844,
+   "total_seconds": 145.3404746998567,
+   "intermediate_texts_with_replacement_char": 0,
+   "memory_before": {
+    "private_gb": 3.094638592,
+    "working_set_gb": 2.581917696
+   },
+   "memory_after": {
+    "private_gb": 3.346804736,
+    "working_set_gb": 2.696343552
+   },
+   "kv_cache_mb": 251.65824,
+   "id": "word_problem",
+   "prompt": "A train leaves at 2:15 pm and travels 180 km at a constant 72 km/h. At what time does it arrive?",
+   "expected": "180/72 = 2.5 h, so 4:45 pm"
+  },
+  {
+   "prompt_tokens": 39,
+   "output_tokens": 320,
+   "stop": "limit",
+   "output": "To compute the integral $\\int_0^1 (3x^2 + 2x)\\,dx$, we can recognize that this is a sum of two simpler integrals. We can split the integral into:\n\n$$\\int_0^1 3x^2\\,dx + \\int_0^1 2x\\,dx$$\n\nWe can then evaluate each integral separately:\n\n1. For the first integral, $\\int_0^1 3x^2\\,dx$, we can integrate $3x^2$ with respect to $x$:\n\n$$\\int 3x^2\\,dx = x^3 + C$$\n\nEvaluating this from $0$ to $1$ gives us:\n\n$$ (1)^3 + C = 1 + C$$\n\nSo, the first integral is $1$.\n\n2. For the second integral, $\\int_0^1 2x\\,dx$, we can integrate $2x$ with respect to $x$:\n\n$$\\int 2x\\,dx = x^2 + C$$\n\nEvaluating this from $0$ to $1$ gives us:\n\n$$ (1)^2 + C = 1 + C$$\n\nSo, the second integral is also $1$.\n\nNow, we add the results of the two integrals:\n\n$$1 + 1 = 2$$\n\nTherefore, the value of the integral $\\int_0^1 (3x^2 + 2x)\\,dx$ is $2",
+   "time_to_first_token_s": 10.731531700119376,
+   "decode_tokens_per_s": 1.8865312128450726,
+   "total_seconds": 180.01299900002778,
+   "intermediate_texts_with_replacement_char": 0,
+   "memory_before": {
+    "private_gb": 3.094925312,
+    "working_set_gb": 2.585010176
+   },
+   "memory_after": {
+    "private_gb": 3.346898944,
+    "working_set_gb": 2.716581888
+   },
+   "kv_cache_mb": 251.65824,
+   "id": "latex",
+   "prompt": "Compute $\\int_0^1 (3x^2 + 2x)\\,dx$.",
+   "expected": "[x^3 + x^2] from 0 to 1 = 2"
+  },
+  {
+   "prompt_tokens": 37,
+   "output_tokens": 320,
+   "stop": "limit",
+   "output": "\n\nHere's a Python function that uses a loop to calculate the n-th Fibonacci number:\n\n```python\ndef fib(n):\n    if n <= 0:\n        return \"Invalid input. n must be a positive integer.\"\n    elif n == 1:\n        return 0\n    elif n == 2:\n        return 1\n    else:\n        a, b = 0, 1\n        for i in range(3, n+1):\n            a, b = b, a + b\n        return b\n```\n\nThe function first checks if the input `n` is valid (i.e., a positive integer). If `n` is 1 or 2, it returns the corresponding Fibonacci number (0 or 1). For `n` greater than 2, the function uses a loop to calculate the n-th Fibonacci number iteratively. It initializes two variables `a` and `b` to 0 and 1, respectively, and then uses a `for` loop to calculate the next Fibonacci number by adding `a` and `b` and updating the values of `a` and `b` accordingly. Finally, the function returns the calculated Fibonacci number.\n\nHere's an example of how to use the `fib` function:\n\n```python\nprint(fib(1))  # Output: 0\nprint(fib(2))  # Output: 1\nprint(fib(10))  # Output: 34\nprint(fib(20))  # Output: 6765",
+   "time_to_first_token_s": 10.965684899827465,
+   "decode_tokens_per_s": 1.953473920583132,
+   "total_seconds": 174.34432140015997,
+   "intermediate_texts_with_replacement_char": 0,
+   "memory_before": {
+    "private_gb": 3.092897792,
+    "working_set_gb": 2.579152896
+   },
+   "memory_after": {
+    "private_gb": 3.346767872,
+    "working_set_gb": 2.716237824
+   },
+   "kv_cache_mb": 251.65824,
+   "id": "code",
+   "prompt": "Write a Python function fib(n) that returns the n-th Fibonacci number using a loop.",
+   "expected": "a loop-based function; checked by running it (F(10) = 55 with F(0) = 0, F(1) = 1)"
+  },
+  {
+   "prompt_tokens": 35,
+   "output_tokens": 7,
+   "stop": "eos",
+   "output": "الcapital of Japan is Tokyo.",
+   "time_to_first_token_s": 11.731432300060987,
+   "decode_tokens_per_s": 1.9281719586858326,
+   "total_seconds": 15.363742099842057,
+   "intermediate_texts_with_replacement_char": 0,
+   "memory_before": {
+    "private_gb": 3.094933504,
+    "working_set_gb": 2.580803584
+   },
+   "memory_after": {
+    "private_gb": 3.346587648,
+    "working_set_gb": 2.613071872
+   },
+   "kv_cache_mb": 251.65824,
+   "id": "arabic",
+   "prompt": "ما هي عاصمة اليابان؟ أجب بجملة واحدة.",
+   "expected": "طوكيو (Tokyo)"
+  },
+  {
+   "prompt_tokens": 196,
+   "output_tokens": 144,
+   "stop": "eos",
+   "output": "The passage states that the library had 12,000 books when it opened in 1998, added 8,000 books in 2005, had 6,200 cardholders by 2010, and received 3,500 of its oldest books for donation in 2015. It also received a gift of 2,000 children's books in 2018. However, it does not explicitly state the total number of books at the end of 2018. Therefore, we cannot determine the exact number of books at the end of 2018 without additional information.",
+   "time_to_first_token_s": 24.66169449989684,
+   "decode_tokens_per_s": 1.9136354856879254,
+   "total_seconds": 99.93386249989271,
+   "intermediate_texts_with_replacement_char": 0,
+   "memory_before": {
+    "private_gb": 3.094966272,
+    "working_set_gb": 2.596933632
+   },
+   "memory_after": {
+    "private_gb": 3.346681856,
+    "working_set_gb": 2.711764992
+   },
+   "kv_cache_mb": 251.65824,
+   "id": "long_context",
+   "prompt": "Read the passage and answer the question.\n\nThe Riverside public library opened in 1998 with 12,000 books. Over the next decade it grew steadily: in 2005 the city council funded a new wing, and the library added 8,000 books that year. Membership also rose, from 1,500 cardholders at opening to 6,200 by 2010. In 2015 the library donated 3,500 of its oldest books to a school in a neighbouring town, and in 2018 it received a gift of 2,000 children's books from a local publisher. The library has not added or removed any other books.\n\nQuestion: How many books did the library have at the end of 2018?",
+   "expected": "12000 + 8000 - 3500 + 2000 = 18500"
+  }
+ ]
+}
