@@ -8,7 +8,7 @@ This submission evaluates that design on the real model, including an **adaptive
 
 **Supported:** Windows 10 or 11, 64-bit, with Python 3.13 (tested on Windows 11 with Python 3.13.14; Python 3.10 to 3.12 may work but are untested). Linux and macOS are not supported: the engine reads expert weights with Windows-only unbuffered file I/O, so on those systems the engine tests are skipped (skipped is not passed) and only the saved-evidence checker runs. You also need Git and an internet connection for the package install.
 
-There is **no web dashboard yet**; everything runs from the command line.
+There is **no web dashboard yet**; everything runs from the command line. The quick-verification commands below were run word for word in a fresh clone of commit e8a27a8 in a new PowerShell session on the development laptop (Windows 11, Python 3.13.14), not yet on another machine.
 
 ### Path 1: quick verification (no model download)
 
@@ -24,8 +24,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1
 
 What each step does and what success looks like:
 
-- **`setup.ps1`** creates `.venv` inside the repository, installs the packages in `requirements-dev.txt` (numpy, numba, psutil, tokenizers, jinja2, pytest) and runs the preflight check. It ends with `Setup complete.` It is safe to rerun, downloads no model files and changes no system settings (`-ExecutionPolicy Bypass` applies to that one PowerShell process only). Measured time on a clean clone: not yet measured.
-- **`pytest`** runs 103 tests and should end with `103 passed`. 63 of them are ExpertRelay's engine tests: each builds a tiny random-weight model and expert store in a temporary folder and runs the real engine on it, covering cache resizing, the live memory budget shrinking and growing mid-generation, and bit-identical output across expert sources, cache sizes and prefetch settings. The other 40 test the evidence checker and the memory-accounting baseline. These show the engine's mechanisms behave as specified on a synthetic model; they say nothing about the real model's quality or speed. Any `failed` or `skipped` count means that part was not verified. Measured time: not yet measured.
+- **`setup.ps1`** creates `.venv` inside the repository, installs the packages in `requirements-dev.txt` (numpy, numba, psutil, tokenizers, jinja2, pytest) and runs the preflight check. It ends with `Setup complete.` It is safe to rerun, downloads no model files and changes no system settings (`-ExecutionPolicy Bypass` applies to that one PowerShell process only). Measured on a fresh clone on the development laptop (packages downloaded fresh, no pip cache): 114 s; a rerun takes a few seconds.
+- **`pytest`** runs 103 tests and should end with `103 passed`. 63 of them are ExpertRelay's engine tests: each builds a tiny random-weight model and expert store in a temporary folder and runs the real engine on it, covering cache resizing, the live memory budget shrinking and growing mid-generation, and bit-identical output across expert sources, cache sizes and prefetch settings. The other 40 test the evidence checker and the memory-accounting baseline. These show the engine's mechanisms behave as specified on a synthetic model; they say nothing about the real model's quality or speed. Any `failed` or `skipped` count means that part was not verified. Measured time: 22 s.
 - **`compare_artifacts.py`** reads two committed result files from real-model runs and should print `PASS: identical generated token ids (80 tokens) ...`. It checks the **recorded** evidence; it does not rerun the real model.
 
 The preflight check can be rerun at any time: `.\.venv\Scripts\python.exe scripts\preflight.py`. Passing it does not guarantee a real-model run will fit in memory.
