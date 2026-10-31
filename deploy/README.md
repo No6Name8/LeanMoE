@@ -128,9 +128,13 @@ cache is **uncontrolled**, and manifest verification can warm it. No cache flush
 VM resize, purchased resource or isolation relaxation is required. System disk
 counters include unrelated work and do not establish disk throughput causality.
 
-The existing task-success artifact is a **three-task pilot**, both modes, first
-request plus repeat. The full task-success study remains unfinished. The pilot
-and its runner/scorer are kept separate from deployment commits.
+The [task-success pilot](../results/task_benchmark_pilot_20261030-134509.json)
+is a **three-task harness check**, both modes, first request plus repeat. The
+[fixed specification and reproduction guide](../docs/TASK_BENCHMARK.md), runner,
+scorer and pilot were committed separately from deployment/access changes at
+`ba037e065ef0f851c9594a22ea0a2248b9c32b0a`. The full laptop task study
+remains unfinished; these harness checks are not real-model task-success results
+for all twelve tasks. Model store transfer and authentication remain private.
 
 ## Recovery, credential remediation and teardown
 

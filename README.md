@@ -4,13 +4,13 @@
 
 **Run a Qwen mixture-of-experts model on memory-constrained Windows machines by keeping useful experts in RAM and reading the rest as needed.**
 
-[Live Demo](https://leanmoe-demo-1.eastus.cloudapp.azure.com/) · [Quick Start](#verify-without-downloading-the-model) · [Results](#recorded-laptop-results) · [Tests](#tests-and-evidence)
+[Live Demo](https://leanmoe-demo-1.eastus.cloudapp.azure.com/) · [Presentation](docs/presentation/LeanMoE-Presentation-Polished-v4.pptx) · [Quick Start](#verify-without-downloading-the-model) · [Results](#recorded-laptop-results) · [Tests](#tests-and-evidence)
 
 Windows only · Python 3.13 tested · Qwen1.5-MoE-A2.7B-Chat int8
 
 The live demo runs the **same engine and model store on a Windows cloud server**; your browser needs no model download. It requires credentials supplied by the demo owner. The local dashboard stays on `127.0.0.1` and does not expose an unauthenticated inference server.
 
-[How it works](#how-it-works) · [Laptop evidence](#recorded-laptop-results) · [Cloud results](#cloud-deployment-and-results) · [Verify locally](#verify-without-downloading-the-model) · [Full Qwen setup](#use-the-full-qwen-model) · [Tests and evidence](#tests-and-evidence) · [Ownership and limits](#ownership-and-limits)
+[How it works](#how-it-works) · [Laptop evidence](#recorded-laptop-results) · [Task-success evaluation](docs/TASK_BENCHMARK.md) · [Cloud results](#cloud-deployment-and-results) · [Verify locally](#verify-without-downloading-the-model) · [Full Qwen setup](#use-the-full-qwen-model) · [Tests and evidence](#tests-and-evidence) · [Ownership and limits](#ownership-and-limits)
 
 ## How it works
 
@@ -156,7 +156,7 @@ Check the **saved** 80-token adaptation pair without model weights:
 .\.venv\Scripts\python.exe eval\compare_artifacts.py results\adaptive_demo_20261030-060626.json results\adaptive_demo_20261030-060728.json
 ```
 
-The [strict checker](eval/compare_artifacts.py) verifies the recorded cut, settings and matching token IDs; a passing result does **not** run new inference or prove the answer is correct. [Evidence index](results/EVIDENCE.md) · [Raw laptop paging comparison](results/config_compare_mmap_full_20261030-060448.json) · [Raw cloud comparison](results/resource_profile_comparison.json) · [Design decisions](DECISIONS.md).
+The [strict checker](eval/compare_artifacts.py) verifies the recorded cut, settings and matching token IDs; a passing result does **not** run new inference or prove the answer is correct. The [task-success evaluation](docs/TASK_BENCHMARK.md) fixes 12 questions and reports the earlier three-task pilot separately from any later completed run. [Evidence index](results/EVIDENCE.md) · [Raw laptop paging comparison](results/config_compare_mmap_full_20261030-060448.json) · [Raw cloud comparison](results/resource_profile_comparison.json) · [Design decisions](DECISIONS.md).
 
 ![Current Evidence tab with recorded adaptation and paging figures](docs/readme/evidence-desktop.png)
 
@@ -176,7 +176,7 @@ The [strict checker](eval/compare_artifacts.py) verifies the recorded cut, setti
 
 ## Ownership and limits
 
-The engine in [src/engine/](src/engine/) is adapted from **ExpertRelay**, Abdullah Ali Alanazi's earlier private research project (2026); see its [concept note](https://doi.org/10.5281/zenodo.22980838) and the source attribution headers. ExpertRelay supplied the int8 store format/readers, fused NumPy runtime, expert cache, predictor, LiveBudget and startup guard. LeanMoE ports and integrates that work for one Windows machine, evaluates the real Qwen Chat store, corrects memory accounting, adds streaming/dashboard/evidence and protected cloud access, and measures automatic cache sizing. [Decision record](DECISIONS.md) separates prior mechanisms from submission changes.
+The engine in [src/engine/](src/engine/) is adapted from **ExpertRelay**, Abdullah Ali Alanazi's earlier private research project (2026); see its [concept note](https://doi.org/10.5281/zenodo.22980838) and the source attribution headers. ExpertRelay supplied the int8 store format/readers, fused NumPy runtime, expert cache, predictor, LiveBudget and startup guard. LeanMoE ports and integrates that work for one Windows machine, evaluates the real Qwen Chat store, corrects memory accounting, adds streaming/dashboard/evidence and protected cloud access, and measures automatic cache sizing. [Decision record](DECISIONS.md) separates prior mechanisms from submission changes. The compact [presentation deck](docs/presentation/LeanMoE-Presentation-Polished-v4.pptx) is available; a final demo recording is still outstanding.
 
 These measurements cover limited prompts and hardware. Windows file caching and background load affect timing; a fresh process is not a cold OS cache. Memory samples can miss short peaks. The Qwen model can answer incorrectly even when both execution modes emit identical tokens. Neither lower energy use nor fewer arithmetic operations has been measured here. The cloud comparison is not an equal-memory experiment, and the full task-success study is unfinished.
 

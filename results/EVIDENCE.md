@@ -2,6 +2,12 @@
 
 Every file here is raw output of a script in `eval/`, written on one Windows laptop (Intel Core i5-12450H, 8.30 GB RAM, NVMe SSD), with the Qwen1.5-MoE-A2.7B-Chat int8 store, the numpy backend and the fused int8 kernel. None has been edited after it was written. Every LeanMoE measurement in the README comes from a file listed here; figures from ExpertRelay are labeled as historical. "Private memory" is what the process has committed (charged against Windows' commit limit); "working set" is the part in physical RAM. GB means 10^9 bytes.
 
+## Task-success evaluation (`eval/task_benchmark.py`)
+
+The [fixed 12-task specification](../configs/tasks/task_benchmark_v1.json), [specification lock](task_benchmark_spec_lock.json), [runner](../eval/task_benchmark.py), [scorer](../eval/task_scoring.py) and [method/reproduction guide](../docs/TASK_BENCHMARK.md) are committed. The [three-task pilot](task_benchmark_pilot_20261030-134509.json) checked the harness: first request and warm repeat in each mode, all three pilot tasks rule-correct and EOS-completed in both modes. It is **not** a twelve-task quality result. The pilot records the task-file hash used before it ran; the first Git lock was made after that pilot. The numerical/choice rules are unchanged, but the `Answer:` detector was tightened after the pilot to reject non-answer labels.
+
+The task study grades answers and 120-second post-load task latency, while the throughput and 80-token records below measure different things. A `correct` rule score must be read with stop reason and manual audit; a timeout is neither a completion nor a precise latency. No generated code is executed by the scorer.
+
 ## Budget-cut demo (`eval/adaptive_demo.py`)
 
 Same prompt (52 tokens with the chat template), 80 new tokens, greedy, prefetch on.
