@@ -1,0 +1,786 @@
+{
+ "design": {
+  "generation": "greedy (argmax), chat template of the store, stream_generate, stop at <|im_end|> / <|endoftext|>",
+  "max_new_tokens": 128,
+  "max_seq": 512,
+  "time_limit_s": 120,
+  "time_limit_definition": "per request: from the start of stream_generate (prefill included) to the final token; model load excluded. A request over the limit still runs to completion and is scored, but does not count as 'correct within the time limit'.",
+  "hard_cap_s": 300,
+  "hard_cap_definition": "safety stop: a request still running after 300 s is cancelled at the next token boundary and scored as not correct (status 'cancelled').",
+  "memory_budget_gb": 3.0,
+  "memory_budget_note": "LeanMoE cache sized by the engine's normal budget calculation (budget minus estimated rest of process), as in eval/config_compare.py; the memory-mapped mode uses the same budget value for its startup guard.",
+  "openblas_threads": "engine default (4)",
+  "process_layout": "one fresh child process per (task, mode): load the model, request 1 = 'first request' (first request after load), request 2 = 'warm repeat' (the same prompt again in the same process). Scores and timings of the two are reported separately, never averaged together.",
+  "order": "tasks in the listed order; LeanMoE first for even task positions (0, 2, ...), Windows paging first for odd positions; one process at a time",
+  "prompt_suffix": "\n\nKeep your reply short. End with a final line of the form: Answer: <your answer>"
+ },
+ "task_file": "task_benchmark_v1.json",
+ "task_file_sha256": "0b7a2713200513a5f4cc62fc582028e1a93ee15c0c461b41448ce45d2f087a35",
+ "label": "pilot",
+ "started_utc": "2026-10-30T10:45:09Z",
+ "tasks": [
+  {
+   "id": "arith_add",
+   "category": "arithmetic",
+   "question": "What is 347 + 589?",
+   "expected": 936,
+   "rule": "last_number",
+   "prediction": "correct"
+  },
+  {
+   "id": "eq_quadratic",
+   "category": "equation",
+   "question": "Find both solutions of x^2 \u2212 5x + 6 = 0.",
+   "expected": [
+    2,
+    3
+   ],
+   "rule": "root_set",
+   "prediction": "uncertain: the model factored a different quadratic wrongly in an earlier dashboard check"
+  },
+  {
+   "id": "read_train",
+   "category": "reading",
+   "question": "Read the timetable and answer the question.\nTrain A: departs 09:15, arrives 11:40.\nTrain B: departs 10:05, arrives 12:10.\nQuestion: Which train has the shorter journey time? Answer with A or B.",
+   "expected": "B",
+   "rule": "choice",
+   "options": [
+    "B",
+    "A"
+   ],
+   "case_sensitive": true,
+   "prediction": "wrong (journeys 2 h 25 min and 2 h 05 min; needs time subtraction)"
+  }
+ ],
+ "runs": [
+  {
+   "task_id": "arith_add",
+   "category": "arithmetic",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 2.629627904,
+    "commit_available_gb": 6.247743488,
+    "commit_limit_gb": 16.085409792
+   },
+   "child_wall_s": 30.04811879999943,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.83025408,
+   "child_peak_working_set_gb": 2.554806272,
+   "openblas_threads": 4,
+   "import_private_gb": 0.130625536,
+   "load_s": 6.5575582000001305,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.553475072,
+   "prompt_tokens": 51,
+   "load_memory": {
+    "peak_private_gb": 2.548969472,
+    "peak_working_set_gb": 1.675259904,
+    "samples": 114
+   },
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 11.75343249999969,
+     "time_to_first_token_s": 8.488763800000015,
+     "decode_tokens_per_s": 1.8413989574360299,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      24,
+      18,
+      21
+     ],
+     "text": "Answer: 936",
+     "private_after_gb": 2.615140352,
+     "expert_stats": {
+      "cache_hits": 4,
+      "demand_reads": 328,
+      "prefetch_hits": 1198,
+      "expert_read_seconds": 3.110617499996806
+     },
+     "memory": {
+      "peak_private_gb": 2.828378112,
+      "peak_working_set_gb": 2.54347264,
+      "samples": 198
+     },
+     "score": "correct",
+     "answer_field": "936",
+     "reason": "last number 936 equals 936",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 9.915937199999462,
+     "time_to_first_token_s": 6.728558200000407,
+     "decode_tokens_per_s": 1.8846256666970274,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      24,
+      18,
+      21
+     ],
+     "text": "Answer: 936",
+     "private_after_gb": 2.6150912,
+     "expert_stats": {
+      "cache_hits": 4,
+      "demand_reads": 370,
+      "prefetch_hits": 1141,
+      "expert_read_seconds": 3.1338449000159017
+     },
+     "memory": {
+      "peak_private_gb": 2.824142848,
+      "peak_working_set_gb": 2.543816704,
+      "samples": 162
+     },
+     "score": "correct",
+     "answer_field": "936",
+     "reason": "last number 936 equals 936",
+     "within_time_limit": true
+    }
+   ],
+   "error": null,
+   "order": 1
+  },
+  {
+   "task_id": "arith_add",
+   "category": "arithmetic",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 3.403091968,
+    "commit_available_gb": 6.381965312,
+    "commit_limit_gb": 16.085409792
+   },
+   "child_wall_s": 70.10511709999992,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.490307584,
+   "child_peak_working_set_gb": 5.66798336,
+   "openblas_threads": 4,
+   "import_private_gb": 0.130727936,
+   "load_s": 2.7453295000013895,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216547328,
+   "prompt_tokens": 51,
+   "load_memory": {
+    "peak_private_gb": 0.187879424,
+    "peak_working_set_gb": 0.102801408,
+    "samples": 44
+   },
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 29.229913200000738,
+     "time_to_first_token_s": 23.691339799999696,
+     "decode_tokens_per_s": 1.0906999144958531,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      24,
+      18,
+      21
+     ],
+     "text": "Answer: 936",
+     "private_after_gb": 0.274239488,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "memory": {
+      "peak_private_gb": 0.488394752,
+      "peak_working_set_gb": 5.41974528,
+      "samples": 474
+     },
+     "score": "correct",
+     "answer_field": "936",
+     "reason": "last number 936 equals 936",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 35.616668700000446,
+     "time_to_first_token_s": 29.662591800000882,
+     "decode_tokens_per_s": 1.0112250872270736,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      24,
+      18,
+      21
+     ],
+     "text": "Answer: 936",
+     "private_after_gb": 0.274128896,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "memory": {
+      "peak_private_gb": 0.483495936,
+      "peak_working_set_gb": 5.670821888,
+      "samples": 575
+     },
+     "score": "correct",
+     "answer_field": "936",
+     "reason": "last number 936 equals 936",
+     "within_time_limit": true
+    }
+   ],
+   "error": null,
+   "order": 2
+  },
+  {
+   "task_id": "eq_quadratic",
+   "category": "equation",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 5.463252992,
+    "commit_available_gb": 6.392938496,
+    "commit_limit_gb": 16.085409792
+   },
+   "child_wall_s": 107.41133269999955,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.490446848,
+   "child_peak_working_set_gb": 5.67134208,
+   "openblas_threads": 4,
+   "import_private_gb": 0.130535424,
+   "load_s": 3.776178699999946,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216367104,
+   "prompt_tokens": 57,
+   "load_memory": {
+    "peak_private_gb": 0.179777536,
+    "peak_working_set_gb": 0.103436288,
+    "samples": 61
+   },
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 42.18668429999889,
+     "time_to_first_token_s": 29.69308760000058,
+     "decode_tokens_per_s": 0.8831390931786448,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      17,
+      11,
+      856,
+      284,
+      220,
+      18
+     ],
+     "text": "Answer: x = 2, x = 3",
+     "private_after_gb": 0.274190336,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "memory": {
+      "peak_private_gb": 0.48848896,
+      "peak_working_set_gb": 5.655986176,
+      "samples": 679
+     },
+     "score": "correct",
+     "answer_field": "x = 2, x = 3",
+     "reason": "solutions [2.0, 3.0] match",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 54.061120300000766,
+     "time_to_first_token_s": 38.41961110000011,
+     "decode_tokens_per_s": 0.7178803369183524,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      17,
+      11,
+      856,
+      284,
+      220,
+      18
+     ],
+     "text": "Answer: x = 2, x = 3",
+     "private_after_gb": 0.272605184,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "memory": {
+      "peak_private_gb": 0.482983936,
+      "peak_working_set_gb": 5.665083392,
+      "samples": 865
+     },
+     "score": "correct",
+     "answer_field": "x = 2, x = 3",
+     "reason": "solutions [2.0, 3.0] match",
+     "within_time_limit": true
+    }
+   ],
+   "error": null,
+   "order": 3
+  },
+  {
+   "task_id": "eq_quadratic",
+   "category": "equation",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 5.334552576,
+    "commit_available_gb": 6.427680768,
+    "commit_limit_gb": 16.085409792
+   },
+   "child_wall_s": 36.100080099999104,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.830430208,
+   "child_peak_working_set_gb": 2.558287872,
+   "openblas_threads": 4,
+   "import_private_gb": 0.130527232,
+   "load_s": 5.172763799999302,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.55455232,
+   "prompt_tokens": 57,
+   "load_memory": {
+    "peak_private_gb": 1.754034176,
+    "peak_working_set_gb": 1.671155712,
+    "samples": 83
+   },
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 14.195205500000156,
+     "time_to_first_token_s": 8.356381199999305,
+     "decode_tokens_per_s": 1.88522370741535,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      17,
+      11,
+      856,
+      284,
+      220,
+      18
+     ],
+     "text": "Answer: x = 2, x = 3",
+     "private_after_gb": 2.615066624,
+     "expert_stats": {
+      "cache_hits": 5,
+      "demand_reads": 691,
+      "prefetch_hits": 1504,
+      "expert_read_seconds": 4.649522900006559
+     },
+     "memory": {
+      "peak_private_gb": 2.828509184,
+      "peak_working_set_gb": 2.5467904,
+      "samples": 230
+     },
+     "score": "correct",
+     "answer_field": "x = 2, x = 3",
+     "reason": "solutions [2.0, 3.0] match",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 14.725592700000561,
+     "time_to_first_token_s": 7.906322499999078,
+     "decode_tokens_per_s": 1.6139420175788495,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      17,
+      11,
+      856,
+      284,
+      220,
+      18
+     ],
+     "text": "Answer: x = 2, x = 3",
+     "private_after_gb": 2.615058432,
+     "expert_stats": {
+      "cache_hits": 5,
+      "demand_reads": 727,
+      "prefetch_hits": 1493,
+      "expert_read_seconds": 5.392526199982967
+     },
+     "memory": {
+      "peak_private_gb": 2.824654848,
+      "peak_working_set_gb": 2.547564544,
+      "samples": 240
+     },
+     "score": "correct",
+     "answer_field": "x = 2, x = 3",
+     "reason": "solutions [2.0, 3.0] match",
+     "within_time_limit": true
+    }
+   ],
+   "error": null,
+   "order": 4
+  },
+  {
+   "task_id": "read_train",
+   "category": "reading",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.919164928,
+    "commit_available_gb": 6.472720384,
+    "commit_limit_gb": 16.085409792
+   },
+   "child_wall_s": 35.054422799999884,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.836369408,
+   "child_peak_working_set_gb": 2.578358272,
+   "openblas_threads": 4,
+   "import_private_gb": 0.130740224,
+   "load_s": 3.076316399999996,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.54967808,
+   "prompt_tokens": 103,
+   "load_memory": {
+    "peak_private_gb": 1.755537408,
+    "peak_working_set_gb": 1.673056256,
+    "samples": 50
+   },
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 15.282481000000189,
+     "time_to_first_token_s": 12.750764200000049,
+     "decode_tokens_per_s": 1.5823677395724278,
+     "tokens_generated": 4,
+     "token_ids": [
+      16141,
+      25,
+      425,
+      13
+     ],
+     "text": "Answer: B.",
+     "private_after_gb": 2.61511168,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 177,
+      "prefetch_hits": 1473,
+      "expert_read_seconds": 1.702816899996833
+     },
+     "memory": {
+      "peak_private_gb": 2.834481152,
+      "peak_working_set_gb": 2.567409664,
+      "samples": 250
+     },
+     "score": "correct",
+     "answer_field": "B.",
+     "reason": "names B",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 15.092582200000834,
+     "time_to_first_token_s": 12.609630800001469,
+     "decode_tokens_per_s": 1.6133763093751452,
+     "tokens_generated": 4,
+     "token_ids": [
+      16141,
+      25,
+      425,
+      13
+     ],
+     "text": "Answer: B.",
+     "private_after_gb": 2.615144448,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 221,
+      "prefetch_hits": 1458,
+      "expert_read_seconds": 1.6914971999958652
+     },
+     "memory": {
+      "peak_private_gb": 2.829074432,
+      "peak_working_set_gb": 2.565906432,
+      "samples": 247
+     },
+     "score": "correct",
+     "answer_field": "B.",
+     "reason": "names B",
+     "within_time_limit": true
+    }
+   ],
+   "error": null,
+   "order": 5
+  },
+  {
+   "task_id": "read_train",
+   "category": "reading",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 4.8206848,
+    "commit_available_gb": 6.478364672,
+    "commit_limit_gb": 16.085409792
+   },
+   "child_wall_s": 93.1131314000013,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.491134976,
+   "child_peak_working_set_gb": 4.614578176,
+   "openblas_threads": 4,
+   "import_private_gb": 0.130609152,
+   "load_s": 2.2071063999992475,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216293376,
+   "prompt_tokens": 103,
+   "load_memory": {
+    "peak_private_gb": 0.187813888,
+    "peak_working_set_gb": 0.102547456,
+    "samples": 35
+   },
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 39.00509040000179,
+     "time_to_first_token_s": 33.84247660000074,
+     "decode_tokens_per_s": 0.7775099040182932,
+     "tokens_generated": 4,
+     "token_ids": [
+      16141,
+      25,
+      425,
+      13
+     ],
+     "text": "Answer: B.",
+     "private_after_gb": 0.274178048,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "memory": {
+      "peak_private_gb": 0.491507712,
+      "peak_working_set_gb": 4.512108544,
+      "samples": 638
+     },
+     "score": "correct",
+     "answer_field": "B.",
+     "reason": "names B",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 50.346329300000434,
+     "time_to_first_token_s": 44.856571399999666,
+     "decode_tokens_per_s": 0.7307258853745874,
+     "tokens_generated": 4,
+     "token_ids": [
+      16141,
+      25,
+      425,
+      13
+     ],
+     "text": "Answer: B.",
+     "private_after_gb": 0.274108416,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "memory": {
+      "peak_private_gb": 0.487682048,
+      "peak_working_set_gb": 4.604407808,
+      "samples": 822
+     },
+     "score": "correct",
+     "answer_field": "B.",
+     "reason": "names B",
+     "within_time_limit": true
+    }
+   ],
+   "error": null,
+   "order": 6
+  }
+ ],
+ "elapsed_s": 372.3518236,
+ "finished_utc": "2026-10-30T10:51:21Z",
+ "summary": {
+  "by_mode": {
+   "cached": {
+    "name": "LeanMoE",
+    "runs": 3,
+    "failed_runs": 0,
+    "load_s": [
+     6.56,
+     5.17,
+     3.08
+    ],
+    "first_request": {
+     "attempted": 3,
+     "correct": 3,
+     "incorrect": 0,
+     "manual_review_open": 0,
+     "correct_within_time_limit": 3,
+     "completed_eos": 3,
+     "truncated_at_token_limit": 0,
+     "cancelled_at_hard_cap": 0,
+     "total_latency_s": 41.2,
+     "latency_s_per_correct_task": 13.7,
+     "total_latency_plus_load_s": 56.0,
+     "latency_plus_load_s_per_correct_task": 18.7,
+     "mean_latency_s": 13.7,
+     "median_latency_s": 14.2,
+     "mean_time_to_first_token_s": 9.87,
+     "mean_decode_tokens_per_s": 1.77,
+     "tokens_generated": 21,
+     "peak_private_gb_max": 2.834,
+     "peak_working_set_gb_max": 2.567
+    },
+    "warm_repeat": {
+     "attempted": 3,
+     "correct": 3,
+     "incorrect": 0,
+     "manual_review_open": 0,
+     "correct_within_time_limit": 3,
+     "completed_eos": 3,
+     "truncated_at_token_limit": 0,
+     "cancelled_at_hard_cap": 0,
+     "total_latency_s": 39.7,
+     "latency_s_per_correct_task": 13.2,
+     "total_latency_plus_load_s": null,
+     "latency_plus_load_s_per_correct_task": null,
+     "mean_latency_s": 13.2,
+     "median_latency_s": 14.7,
+     "mean_time_to_first_token_s": 9.08,
+     "mean_decode_tokens_per_s": 1.704,
+     "tokens_generated": 21,
+     "peak_private_gb_max": 2.829,
+     "peak_working_set_gb_max": 2.566
+    },
+    "child_wall_s_total": 101.2
+   },
+   "mmap": {
+    "name": "Windows paging",
+    "runs": 3,
+    "failed_runs": 0,
+    "load_s": [
+     2.75,
+     3.78,
+     2.21
+    ],
+    "first_request": {
+     "attempted": 3,
+     "correct": 3,
+     "incorrect": 0,
+     "manual_review_open": 0,
+     "correct_within_time_limit": 3,
+     "completed_eos": 3,
+     "truncated_at_token_limit": 0,
+     "cancelled_at_hard_cap": 0,
+     "total_latency_s": 110.4,
+     "latency_s_per_correct_task": 36.8,
+     "total_latency_plus_load_s": 119.2,
+     "latency_plus_load_s_per_correct_task": 39.7,
+     "mean_latency_s": 36.8,
+     "median_latency_s": 39.0,
+     "mean_time_to_first_token_s": 29.08,
+     "mean_decode_tokens_per_s": 0.917,
+     "tokens_generated": 21,
+     "peak_private_gb_max": 0.492,
+     "peak_working_set_gb_max": 5.656
+    },
+    "warm_repeat": {
+     "attempted": 3,
+     "correct": 3,
+     "incorrect": 0,
+     "manual_review_open": 0,
+     "correct_within_time_limit": 3,
+     "completed_eos": 3,
+     "truncated_at_token_limit": 0,
+     "cancelled_at_hard_cap": 0,
+     "total_latency_s": 140.0,
+     "latency_s_per_correct_task": 46.7,
+     "total_latency_plus_load_s": null,
+     "latency_plus_load_s_per_correct_task": null,
+     "mean_latency_s": 46.7,
+     "median_latency_s": 50.3,
+     "mean_time_to_first_token_s": 37.65,
+     "mean_decode_tokens_per_s": 0.82,
+     "tokens_generated": 21,
+     "peak_private_gb_max": 0.488,
+     "peak_working_set_gb_max": 5.671
+    },
+    "child_wall_s_total": 270.6
+   }
+  },
+  "consistency": {
+   "arith_add": true,
+   "eq_quadratic": true,
+   "read_train": true
+  }
+ }
+}

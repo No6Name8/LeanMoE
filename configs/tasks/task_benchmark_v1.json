@@ -1,0 +1,43 @@
+{
+ "name": "task_benchmark_v1",
+ "status": "pre-registered: written before any benchmark or pilot run; not to be edited after runs start (a revised set gets a new name)",
+ "purpose": "Task-level answer correctness of the Qwen1.5-MoE-A2.7B-Chat int8 model under LeanMoE (expert cache + prefetch) and Windows paging (memory-mapped, no cache, no prefetch). Execution consistency (identical tokens) is a separate, earlier claim and is not used to score answers.",
+ "design": {
+  "generation": "greedy (argmax), chat template of the store, stream_generate, stop at <|im_end|> / <|endoftext|>",
+  "max_new_tokens": 128,
+  "max_seq": 512,
+  "time_limit_s": 120,
+  "time_limit_definition": "per request: from the start of stream_generate (prefill included) to the final token; model load excluded. A request over the limit still runs to completion and is scored, but does not count as 'correct within the time limit'.",
+  "hard_cap_s": 300,
+  "hard_cap_definition": "safety stop: a request still running after 300 s is cancelled at the next token boundary and scored as not correct (status 'cancelled').",
+  "memory_budget_gb": 3.0,
+  "memory_budget_note": "LeanMoE cache sized by the engine's normal budget calculation (budget minus estimated rest of process), as in eval/config_compare.py; the memory-mapped mode uses the same budget value for its startup guard.",
+  "openblas_threads": "engine default (4)",
+  "process_layout": "one fresh child process per (task, mode): load the model, request 1 = 'first request' (first request after load), request 2 = 'warm repeat' (the same prompt again in the same process). Scores and timings of the two are reported separately, never averaged together.",
+  "order": "tasks in the listed order; LeanMoE first for even task positions (0, 2, ...), Windows paging first for odd positions; one process at a time",
+  "prompt_suffix": "\n\nKeep your reply short. End with a final line of the form: Answer: <your answer>"
+ },
+ "answer_field": "The text after the last 'Answer:' (case-insensitive; markdown * and _ around it ignored) up to the end of that line. If there is none: 'manual review' when the reply ended normally (end-of-sequence), 'incorrect' when it was cut off (token limit), cancelled or errored.",
+ "number_parsing": "Unicode minus normalised to '-'. A fraction a/b counts as its value. Thousands separators (17,532) accepted. Numbers compared with tolerance 1e-9.",
+ "rules": {
+  "last_number": "correct if the last number in the answer field equals the expected value; manual review if the expected value appears in the field but is not the last number; otherwise incorrect (including no number).",
+  "root_set": "correct if the set of values written as 'x = <number>' equals the expected set, or the set of all numbers in the field equals it; manual review if every expected value appears in the field but neither set matches exactly; otherwise incorrect.",
+  "choice": "correct if the field names the expected option and none of the wrong options; incorrect if it names only wrong options (or none); manual review if it names the expected option and a wrong one. Matching is whole-word; case-insensitive unless 'case_sensitive' is true."
+ },
+ "tasks": [
+  {"id": "arith_add", "category": "arithmetic", "question": "What is 347 + 589?", "expected": 936, "rule": "last_number", "prediction": "correct"},
+  {"id": "arith_mul", "category": "arithmetic", "question": "What is 487 × 36?", "expected": 17532, "rule": "last_number", "prediction": "uncertain: a differently worded 487 x 36 prompt was answered 17,052 in an earlier streaming check"},
+  {"id": "arith_multi", "category": "arithmetic", "question": "Compute 23 × 47 − 389.", "expected": 692, "rule": "last_number", "prediction": "wrong"},
+  {"id": "eq_linear", "category": "equation", "question": "Solve for x: 3x + 7 = 25.", "expected": 6, "rule": "last_number", "prediction": "correct"},
+  {"id": "eq_quadratic", "category": "equation", "question": "Find both solutions of x^2 − 5x + 6 = 0.", "expected": [2, 3], "rule": "root_set", "prediction": "uncertain: the model factored a different quadratic wrongly in an earlier dashboard check"},
+  {"id": "eq_hard", "category": "equation", "question": "Find both solutions of 2x^2 + 3x − 20 = 0.", "expected": [2.5, -4], "rule": "root_set", "prediction": "wrong"},
+  {"id": "fact_capital", "category": "factual", "question": "What is the capital city of Australia?", "expected": "Canberra", "rule": "choice", "options": ["Canberra", "Sydney", "Melbourne"], "prediction": "correct"},
+  {"id": "fact_symbol", "category": "factual", "question": "What is the chemical symbol for sodium?", "expected": "Na", "rule": "choice", "options": ["Na", "S", "So", "Sd", "N"], "case_sensitive": true, "prediction": "correct"},
+  {"id": "fact_moon", "category": "factual", "question": "In which year did people first walk on the Moon?", "expected": 1969, "rule": "last_number", "prediction": "correct"},
+  {"id": "read_marbles", "category": "reading", "question": "Read the passage and answer the question.\nPassage: Ana has 3 red marbles and 5 blue marbles. She gives 2 blue marbles to Ben. Then she buys 4 red marbles.\nQuestion: How many marbles does Ana have now?", "expected": 10, "rule": "last_number", "prediction": "uncertain"},
+  {"id": "read_train", "category": "reading", "question": "Read the timetable and answer the question.\nTrain A: departs 09:15, arrives 11:40.\nTrain B: departs 10:05, arrives 12:10.\nQuestion: Which train has the shorter journey time? Answer with A or B.", "expected": "B", "rule": "choice", "options": ["B", "A"], "case_sensitive": true, "prediction": "wrong (journeys 2 h 25 min and 2 h 05 min; needs time subtraction)"},
+  {"id": "read_oldest", "category": "reading", "question": "Read the list and answer the question.\nOmar: 34 years old\nLina: 41 years old\nSami: 29 years old\nQuestion: Who is the oldest?", "expected": "Lina", "rule": "choice", "options": ["Lina", "Omar", "Sami"], "prediction": "correct"}
+ ],
+ "pilot": ["arith_add", "eq_quadratic", "read_train"],
+ "pilot_note": "The pilot runs these three tasks in both modes only to time the procedure and test the harness; its records are kept and reported as a pilot, separately from the full run."
+}

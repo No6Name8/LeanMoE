@@ -1,0 +1,14 @@
+{
+  "role": "Specification lock recorded before new inference after the three-task pilot",
+  "task_file": "configs/tasks/task_benchmark_v1.json",
+  "task_file_sha256": "0b7a2713200513a5f4cc62fc582028e1a93ee15c0c461b41448ce45d2f087a35",
+  "hash_representation": "SHA-256 of UTF-8 task file with CRLF normalized to LF (the original pilot file used LF)",
+  "original_scorer": "eval/task_scoring.py",
+  "original_scorer_sha256": "6d0dd82f48942dd3be223560bcfec4ba968d906cc4181bf69ee500a6dd3a2ed2",
+  "pilot_file": "results/task_benchmark_pilot_20261030-134509.json",
+  "pilot_file_sha256": "229e2bb748d2fa9064cd96598b2c4cdea6935011b7bb992954262be101f998b4",
+  "pilot_embedded_task_sha256_matches": true,
+  "pilot_design_and_tasks_match_spec": true,
+  "baseline_commit": "a080f174fee342ca091dfa2fa449f91d93234b99",
+  "limits": "The matching pilot hash and file timestamps support that this specification was fixed before the pilot, but untracked files cannot independently prove when they were authored. The original scoring rules are preserved. Any later harness or audit changes must be identified separately."
+}
