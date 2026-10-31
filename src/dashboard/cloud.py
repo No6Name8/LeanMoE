@@ -1,12 +1,9 @@
-"""Loopback-only, fixed-origin relay for the protected cloud dashboard API.
+"""Loopback-only, fixed-origin relay for the public, bounded cloud demo API.
 
-The browser's Basic-auth challenge belongs to this loopback relay. Credentials
-are forwarded over verified HTTPS for each request and never stored here. The
-cloud's signed browser cookie stays server-side, keyed by a separate opaque,
-HttpOnly loopback cookie, so cloud visitor isolation remains authoritative.
+The cloud's signed visitor cookie stays server-side, keyed by a separate
+opaque HttpOnly loopback cookie. No visitor credential is sent or stored.
 """
 
-import hashlib
 import http.client
 from http.cookies import SimpleCookie
 import secrets
@@ -31,30 +28,27 @@ class CloudProxy:
         self.sessions = {}
         self.lock = threading.Lock()
 
-    def _session(self, cookie_header, authorization):
+    def _session(self, cookie_header):
         cookies = SimpleCookie()
         try:
             cookies.load(cookie_header or "")
             token = cookies[SESSION_COOKIE].value if SESSION_COOKIE in cookies else ""
         except Exception:
             token = ""
-        digest = hashlib.sha256(authorization.encode("ascii")).digest()
         with self.lock:
             item = self.sessions.get(token)
-            if item and item[0] == digest and time.monotonic() - item[2] < 7200:
-                return token, item[1]
+            if item and time.monotonic() - item[1] < 7200:
+                return token, item[0]
         return None, None
 
-    def open(self, method, path, raw, authorization, cookie_header):
+    def open(self, method, path, raw, cookie_header):
         if path not in PATHS or method not in ("GET", "POST") or (method == "GET") != (path == "/api/status"):
             raise ValueError("unsupported cloud API path")
-        if not authorization.startswith("Basic ") or len(authorization) > 1024 or not authorization.isascii():
-            raise PermissionError("Cloud credentials required")
-        token, remote_cookie = self._session(cookie_header, authorization)
+        token, remote_cookie = self._session(cookie_header)
         if method == "POST" and not remote_cookie:
             raise PermissionError("Cloud session expired; select Cloud again to reconnect")
         conn = http.client.HTTPSConnection(self.host, self.port, timeout=30, context=ssl.create_default_context())
-        headers = {"Authorization": authorization, "Accept": "application/json, text/event-stream"}
+        headers = {"Accept": "application/json, text/event-stream"}
         if remote_cookie:
             headers["Cookie"] = remote_cookie
         if method == "POST":
@@ -62,6 +56,8 @@ class CloudProxy:
         try:
             conn.request(method, path, body=raw if method == "POST" else None, headers=headers)
             response = conn.getresponse()
+            if response.status == 401:
+                raise ValueError("Cloud deployment still requires login; the public release is not live")
             issued = response.getheader("Set-Cookie")
             if response.status == 200 and method == "GET":
                 payload = response.read(2_000_001)
@@ -69,21 +65,22 @@ class CloudProxy:
                     raise ValueError("cloud status too large")
                 import json
                 status = json.loads(payload)
-                if status.get("system", {}).get("execution_location") != "server" or not status.get("access", {}).get("protected"):
-                    raise ValueError("cloud backend did not report protected server execution")
+                if (status.get("system", {}).get("execution_location") != "server" or
+                        not status.get("access", {}).get("protected") or
+                        not status.get("access", {}).get("public_demo")):
+                    raise ValueError("cloud backend did not report public server execution")
                 if issued:
                     remote_cookie = issued.split(";", 1)[0]
                 if not remote_cookie:
                     raise ValueError("cloud did not establish a visitor session")
                 if not token:
                     token = secrets.token_urlsafe(32)
-                digest = hashlib.sha256(authorization.encode("ascii")).digest()
                 with self.lock:
                     now = time.monotonic()
-                    self.sessions = {k: v for k, v in self.sessions.items() if now - v[2] < 7200}
+                    self.sessions = {k: v for k, v in self.sessions.items() if now - v[1] < 7200}
                     if len(self.sessions) >= 500 and token not in self.sessions:
                         raise ValueError("too many cloud sessions")
-                    self.sessions[token] = (digest, remote_cookie, now)
+                    self.sessions[token] = (remote_cookie, now)
                 return conn, response, payload, token
             return conn, response, None, None
         except Exception:

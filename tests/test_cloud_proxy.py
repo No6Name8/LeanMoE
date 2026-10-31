@@ -1,8 +1,8 @@
-"""The loopback cloud relay keeps credentials out of code and sessions separate."""
+"""The public cloud relay uses separate browser sessions and verified HTTPS."""
 
-import base64
 import http.client
 import json
+import threading
 
 import pytest
 
@@ -10,12 +10,8 @@ from src.dashboard import cloud
 
 
 class Response:
-    status = 200
-
     def __init__(self, body, cookie=None, status=200):
-        self.body = body
-        self.cookie = cookie
-        self.status = status
+        self.body, self.cookie, self.status = body, cookie, status
 
     def getheader(self, name, default=None):
         return self.cookie if name == "Set-Cookie" else default
@@ -42,69 +38,67 @@ class Connection:
         pass
 
 
-def auth(user):
-    return "Basic " + base64.b64encode(f"{user}:private-password".encode()).decode()
+def status_response(cookie="__Host-leanmoe=signed; Secure; HttpOnly", *, location="server", public=True):
+    return Response(json.dumps({"system": {"execution_location": location},
+                                "access": {"protected": True, "public_demo": public}}).encode(), cookie)
 
 
-def test_cloud_status_requires_protected_server_and_keeps_cookie_server_side(monkeypatch):
+def test_cloud_relay_is_anonymous_and_keeps_sessions_separate(monkeypatch):
     monkeypatch.setattr(cloud.http.client, "HTTPSConnection", Connection)
     proxy = cloud.CloudProxy("https://demo.example.test")
-    with pytest.raises(PermissionError):
-        proxy.open("GET", "/api/status", b"", "", "")
-    Connection.response = Response(json.dumps({"system": {"execution_location": "server"},
-                                               "access": {"protected": True}}).encode(), "__Host-leanmoe=signed; Secure; HttpOnly")
-    conn, response, payload, token = proxy.open("GET", "/api/status", b"", auth("alice"), "")
-    assert response.status == 200 and token
-    assert b"signed" not in payload
-    assert "Authorization" in Connection.calls[-1][3]
+    Connection.response = status_response()
+    _, response, payload, token = proxy.open("GET", "/api/status", b"", "")
+    assert response.status == 200 and token and b"signed" not in payload
+    assert "Authorization" not in Connection.calls[-1][3]
     assert "Cookie" not in Connection.calls[-1][3]
-    Connection.response = Response(json.dumps({"system": {"execution_location": "server"},
-                                               "access": {"protected": True}}).encode(), "__Host-leanmoe=other; Secure; HttpOnly")
-    _, _, _, other_browser = proxy.open("GET", "/api/status", b"", auth("alice"), "")
+    Connection.response = status_response("__Host-leanmoe=other; Secure; HttpOnly")
+    _, _, _, other_browser = proxy.open("GET", "/api/status", b"", "")
     assert other_browser != token
-    assert proxy.sessions[other_browser][1] != proxy.sessions[token][1]
-    _, _, _, second = proxy.open("GET", "/api/status", b"", auth("bob"), f"{cloud.SESSION_COOKIE}={token}")
-    assert second != token  # another account cannot inherit this cloud visitor session
+    assert proxy.sessions[other_browser][0] != proxy.sessions[token][0]
     Connection.response = Response(b"{}")
-    proxy.open("POST", "/api/cancel", b'{}', auth("alice"), f"{cloud.SESSION_COOKIE}={token}")
+    proxy.open("POST", "/api/cancel", b'{}', f"{cloud.SESSION_COOKIE}={token}")
     assert Connection.calls[-1][3]["Cookie"] == "__Host-leanmoe=signed"
     assert Connection.calls[-1][3]["Origin"] == "https://demo.example.test"
-    with pytest.raises(PermissionError):
-        proxy.open("POST", "/api/compare", b'{}', auth("bob"), f"{cloud.SESSION_COOKIE}={token}")
+    assert "Authorization" not in Connection.calls[-1][3]
+    with pytest.raises(PermissionError, match="expired"):
+        proxy.open("POST", "/api/compare", b'{}', "")
 
 
-def test_cloud_relay_rejects_unprotected_or_wrong_location(monkeypatch):
+def test_cloud_relay_rejects_login_required_or_wrong_backend(monkeypatch):
     monkeypatch.setattr(cloud.http.client, "HTTPSConnection", Connection)
     proxy = cloud.CloudProxy("https://demo.example.test")
-    for location, protected in (("local", True), ("server", False)):
-        Connection.response = Response(json.dumps({"system": {"execution_location": location},
-                                                   "access": {"protected": protected}}).encode(), "__Host-leanmoe=signed")
-        with pytest.raises(ValueError, match="protected server"):
-            proxy.open("GET", "/api/status", b"", auth("alice"), "")
+    Connection.response = Response(b"login required", status=401)
+    with pytest.raises(ValueError, match="still requires login"):
+        proxy.open("GET", "/api/status", b"", "")
+    for location, public in (("local", True), ("server", False)):
+        Connection.response = status_response(location=location, public=public)
+        with pytest.raises(ValueError, match="public server"):
+            proxy.open("GET", "/api/status", b"", "")
     with pytest.raises(ValueError, match="unsupported"):
-        proxy.open("POST", "/api/other", b"", auth("alice"), "")
+        proxy.open("POST", "/api/other", b"", "")
 
 
-def test_local_http_cloud_route_requires_auth_and_same_origin(tmp_path):
+def test_local_http_cloud_route_has_no_login_and_requires_same_origin(tmp_path, monkeypatch):
     from src.dashboard.server import serve
+    def unavailable(*args):
+        raise ValueError("public release not live")
+    monkeypatch.setattr(cloud.CloudProxy, "open", unavailable)
     server, engine = serve(0, models_root=tmp_path)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
     try:
         conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
-        # No background thread needed: handle_request serves one request at a time.
-        import threading
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
         conn.request("GET", "/cloud/api/status")
         response = conn.getresponse()
-        assert response.status == 401 and response.getheader("WWW-Authenticate")
+        assert response.status == 502 and response.getheader("WWW-Authenticate") is None
         response.read()
         conn.request("POST", "/cloud/api/generate", "{}", {"Content-Type": "application/json", "Origin": "https://evil.test"})
         response = conn.getresponse()
         assert response.status == 403
         response.read()
         conn.close()
+    finally:
         server.shutdown()
         thread.join(5)
-    finally:
         server.server_close()
         engine.close()

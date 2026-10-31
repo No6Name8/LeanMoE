@@ -1,11 +1,10 @@
-# Protected Windows deployment
+# Bounded public Windows demo
 
 The cloud serves the existing Run / Compare / Evidence dashboard and the actual
 ExpertRelay-derived LeanMoE engine with the Qwen int8 store. There is no third-party
 inference API. Run and Compare share an Execution selector. On the local dashboard,
-Cloud uses a fixed-origin, verified-HTTPS loopback relay and the browser's Basic
-sign-in prompt; credentials are forwarded per request but never stored or placed
-in JavaScript. The cloud's signed visitor cookie stays in the local relay memory,
+Cloud uses a fixed-origin, verified-HTTPS loopback relay with no visitor login.
+The cloud's signed visitor cookie stays in the local relay memory,
 separated by an HttpOnly loopback session cookie. The hosted dashboard selects
 Cloud directly; Local requires a separate local installation. Cloud inference
 runs on the server, never on the visitor's computer. Historical laptop evidence
@@ -48,11 +47,11 @@ It creates subscription-wide quarterly alerts; it does not enforce a spending ca
    [official release](https://github.com/caddyserver/caddy/releases), checking the
    published SHA-256. Do not download executables from mirrors.
 2. Create the private site configuration from [site.example.json](site.example.json).
-   Generate the proxy key using a cryptographic RNG, at least 32 characters.
-   Create individual visitor passwords privately and bcrypt hashes using Caddy's
-   `hash-password` **stdin**, never password command arguments. Save hashes in
-   `C:\LeanMoE-private\visitors.caddy`; protect the directory for administrators,
-   SYSTEM and read-only Local Service. Never commit secrets or print private files.
+   Set `accessMode` to `public` for the no-login demo. Generate the backend proxy
+   key using a cryptographic RNG, at least 32 characters. Protect the private
+   directory for administrators, SYSTEM and read-only Local Service. Never commit
+   secrets or print private files. Legacy `private` mode still supports individual
+   visitor accounts and password hashes in `visitors.caddy`.
 3. Privately transfer the store and [model notices](model-notices/). Generate a
    SHA-256 manifest with [store_manifest.py](store_manifest.py); transfer the
    manifest through an independent authenticated channel. Verify **every file**
@@ -92,17 +91,29 @@ verified HTTPS into a new release directory, records archive SHA-256, tests it,
 checks the model and proxy, then selects it for both tasks. The original checkout,
 venv, stores and private configuration remain in place for recovery. It refuses
 an existing release directory and a busy engine. Publishing briefly interrupts
-availability; reserve a maintenance window. Verify `/api/status` authenticated
-`build.commit`, server location, model availability and browser behavior afterward.
+availability; reserve a maintenance window. Verify unauthenticated HTTPS
+`/api/status` reports `public_demo: true`, the selected `build.commit`, server
+location and model availability; then test Run and Compare in separate browsers.
 No deployment script changes the approved shutdown date or budget.
+
+For the existing private deployment, back up the private `site.json`, set only
+`accessMode` to `public`, and retain its old `visitorAccounts` for the pre-switch
+readiness check. The new supervisor selects [Caddyfile.public](Caddyfile.public)
+and the backend's fixed `public` identity. Publish the pinned release while idle;
+verify the new page without Authorization headers. To roll back, restore the
+private site configuration and prior release tasks together. Never remove the
+backend proxy key or expose port 8770. The public URL can be used by anyone,
+including people without access to the Azure account; the existing cost controls
+and shutdown schedule remain important.
 
 ## Access protection and limits
 
-Caddy authenticates individual accounts and overwrites proxy identity headers.
-The backend requires the proxy secret, exact configured HTTPS Origin, loopback
-Host and a signed Secure/HttpOnly/SameSite browser cookie. Separate browser
-sessions cannot inspect or control each other's request, even with a shared account.
-There is one active job, no queue, three admissions/minute/account, 16 active
+Caddy admits public visitors over HTTPS but overwrites proxy identity headers
+with a fixed public identity and the private backend key. The backend still binds
+only to loopback and requires that key, the exact configured HTTPS Origin,
+loopback Host and a signed Secure/HttpOnly/SameSite browser cookie. Separate
+browser sessions cannot inspect or control each other's request. There is one
+active job, no queue, three admissions/minute **globally**, 16 active
 backend connection threads, a 16 KB body cap, 4,000 prompt characters, a 512-token
 context and 96 output tokens/mode. Automatic allocation uses measured backend RAM
 and commit headroom with a safety reserve. Explicit manual requests retain the
@@ -118,9 +129,9 @@ modes sequentially on the same server, each with a fresh model load.
 
 ## Verification and bounded diagnosis
 
-Run the full pytest suite from the release, then verify HTTPS authentication,
-wrong-origin rejection, token/body limits, same-account browser isolation,
-cross-account isolation, busy behavior, owner-only cancel/budget and final idle
+Run the full pytest suite from the release, then verify no-login HTTPS access,
+direct-backend rejection, wrong-origin rejection, token/body limits, separate-
+browser isolation, busy behavior, owner-only cancel/budget and final idle
 cleanup. HTTP tests use tiny random weights; they do not prove real-model quality.
 
 For initial performance diagnosis reserve the idle backend for maintenance and
@@ -140,7 +151,7 @@ is a **three-task harness check**, both modes, first request plus repeat. The
 scorer and pilot were committed separately from deployment/access changes at
 `ba037e065ef0f851c9594a22ea0a2248b9c32b0a`. The full laptop task study
 remains unfinished; these harness checks are not real-model task-success results
-for all twelve tasks. Model store transfer and authentication remain private.
+for all twelve tasks. Model store transfer and operator credentials remain private.
 
 ## Recovery, credential remediation and teardown
 
@@ -154,12 +165,11 @@ never paste configurations, URLs with signed tokens, or raw commands containing 
 Rotate a leaked proxy key in private configuration and any private operator copies,
 then restart both owned roles while idle. Verify old key rejection and new HTTPS
 access; existing browser cookies become invalid and are renewed on reload. Rotate
-visitor passwords if exposed. Revoke signed transfer URLs by removing their
+legacy private-mode visitor passwords if exposed. Revoke signed transfer URLs by removing their
 stored access policy or rotating the signing storage key; deletion of a dedicated
 transfer account also invalidates its endpoint. Confirm absence using Azure and
-an endpoint check. Unrelated administrator/visitor passwords need no rotation if
-they were not exposed. Credentials must be delivered to visitors privately by
-the owner; no credentials belong in browser code or reports.
+an endpoint check. The public demo needs no visitor password; operator and proxy
+secrets stay private and must never appear in browser code or reports.
 
 To stop compute, deallocate the existing VM through Azure and verify
 `PowerState/deallocated`; an OS shutdown alone can keep compute billable. For

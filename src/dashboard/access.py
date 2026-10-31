@@ -1,8 +1,9 @@
 """Opt-in protection for a localhost backend behind the configured HTTPS proxy.
 
-The proxy authenticates individual visitor accounts. A signed, account-bound
-browser cookie separates even two browsers using the same account. No prompt,
-account name or request identifier is published to other sessions.
+The proxy authenticates individual visitor accounts in private mode or assigns
+the fixed public identity in the opt-in demo mode. A signed browser cookie
+separates visitors in either mode. No prompt, account name or request identifier
+is published to other sessions.
 """
 from dataclasses import dataclass, field
 import hashlib
@@ -22,6 +23,7 @@ class ProxyAccess:
     origin: str
     secret: str = field(repr=False)
     visitors: frozenset[str]
+    public_demo: bool = False
     max_tokens: int = 96
     max_seconds: int = 600  # entire comparison, including both modes
     max_budget_gb: float = 4.0
@@ -38,6 +40,8 @@ class ProxyAccess:
             raise ValueError("provide a proxy secret of at least 32 characters and 1-50 visitor accounts")
         if not all(re.fullmatch(r"[A-Za-z0-9_-]{1,64}", v) for v in self.visitors):
             raise ValueError("invalid visitor account identifier")
+        if self.public_demo and self.visitors != frozenset({"public"}):
+            raise ValueError("public demo requires only the fixed public visitor identity")
 
     def _sign(self, value):
         return hmac.new(self.secret.encode(), value.encode(), hashlib.sha256).hexdigest()
@@ -48,7 +52,7 @@ class ProxyAccess:
         visitor = headers.get("X-LeanMoE-Visitor", "")
         key = headers.get("X-LeanMoE-Proxy-Key", "")
         if not hmac.compare_digest(key.encode(), self.secret.encode()) or visitor not in self.visitors:
-            raise PermissionError("authenticated proxy required")
+            raise PermissionError("trusted proxy required")
         cookie = SimpleCookie()
         try:
             cookie.load(headers.get("Cookie", ""))
@@ -70,7 +74,7 @@ class ProxyAccess:
         return self._sign(f"owner:{visitor}:{stamp}.{nonce}"), set_cookie
 
     def admit(self, owner, now=None):
-        """Three admissions/minute/account; bounded map independent of supplied cookies."""
+        """Three admissions/minute/proxy identity (global in public mode)."""
         now = time.monotonic() if now is None else now
         with self._lock:
             self._rates = {k: v for k, v in self._rates.items() if now - v[0] < 60}

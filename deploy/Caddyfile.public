@@ -1,0 +1,30 @@
+{
+    email {$LEANMOE_ACME_EMAIL}
+    admin 127.0.0.1:2019
+    log {
+        output file C:/LeanMoE-runtime/caddy.log
+    }
+}
+
+{$LEANMOE_PUBLIC_HOST} {
+    request_body {
+        max_size 16KB
+    }
+    header {
+        Strict-Transport-Security "max-age=86400"
+        X-Robots-Tag "noindex, nofollow, noarchive"
+    }
+    reverse_proxy 127.0.0.1:8770 {
+        # Anyone may open the page, but only this localhost proxy knows the
+        # private backend key. Every browser gets a separate signed session.
+        header_up Host 127.0.0.1:8770
+        header_up X-LeanMoE-Proxy-Key {$LEANMOE_PROXY_SECRET}
+        header_up X-LeanMoE-Visitor public
+        header_up -Authorization
+        stream_timeout 660s
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 15s
+        }
+    }
+}

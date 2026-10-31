@@ -36,6 +36,25 @@ def protected(tmp_path):
     engine.close()
 
 
+@pytest.fixture
+def public_demo(tmp_path):
+    access = ProxyAccess(ORIGIN, KEY, frozenset({"public"}), public_demo=True)
+    srv, engine = serve(0, models_root=tmp_path, execution_location="server", access=access)
+    validate = engine.validate
+    engine.validate = lambda body, compare=False: validate({**body, "source": "synthetic"}, compare=compare)
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    yield srv, engine, access
+    if engine.active:
+        engine.active.cancel.cancel()
+    until = time.monotonic() + 15
+    while engine.active and time.monotonic() < until:
+        time.sleep(.02)
+    srv.shutdown()
+    srv.server_close()
+    engine.close()
+
+
 def call(env, method="GET", path="/api/status", body=None, user="alice", cookie=None, **headers):
     conn = http.client.HTTPConnection("127.0.0.1", env[0].server_port, timeout=15)
     h = {"X-LeanMoE-Visitor": user, "X-LeanMoE-Proxy-Key": KEY}
@@ -58,13 +77,13 @@ def session(env, user="alice"):
     return cookie.split(";", 1)[0]
 
 
-def start(env, cookie, on_event=None):
+def start(env, cookie, on_event=None, user="alice"):
     events = []
     def run():
         conn = http.client.HTTPConnection("127.0.0.1", env[0].server_port, timeout=20)
         conn.request("POST", "/api/generate", json.dumps({"source": "real", "prompt": "private Alice prompt",
                      "max_new_tokens": 50}), {"Content-Type": "application/json", "Origin": ORIGIN,
-                     "X-LeanMoE-Proxy-Key": KEY, "X-LeanMoE-Visitor": "alice", "Cookie": cookie})
+                     "X-LeanMoE-Proxy-Key": KEY, "X-LeanMoE-Visitor": user, "Cookie": cookie})
         response = conn.getresponse()
         assert response.status == 200
         for line in response:
@@ -93,6 +112,29 @@ def test_proxy_auth_cookie_and_origin_are_required(protected):
     assert call(protected, "POST", "/api/generate", body, cookie=c, Origin="https://evil.test")[0] == 403
     assert call(protected, "POST", "/api/generate", body, cookie=c, Origin="")[0] == 403
     assert call(protected, cookie=c, Host="demo.example.test")[0] == 403  # proxy must rewrite Host
+
+
+def test_public_guest_has_no_login_but_keeps_browser_isolation_and_global_limit(public_demo):
+    env = public_demo
+    a, b = session(env, "public"), session(env, "public")
+    assert call(env, user="public", cookie=a)[1]["access"]["public_demo"] is True
+    assert a != b
+    env[1].test_token_delay = .1
+    t, events = start(env, a, user="public")
+    request_id = events[0]["request_id"]
+    try:
+        status = call(env, user="public", cookie=b)[1]
+        assert status["busy"] and status["active"] is None and status["loaded"] is None
+        assert call(env, "POST", "/api/cancel", {"request_id": request_id}, user="public", cookie=b)[0] == 409
+        assert call(env, "POST", "/api/generate", {"source": "real", "prompt": "other"}, user="public", cookie=b)[0] == 409
+        assert call(env, "POST", "/api/cancel", {"request_id": request_id}, user="public", cookie=a)[0] == 200
+    finally:
+        env[1].active.cancel.cancel() if env[1].active else None
+        t.join(15)
+    assert not t.is_alive() and env[1].model is None
+    for cookie in (a, b):
+        assert call(env, "POST", "/api/generate", {"source": "synthetic", "prompt": "x"}, user="public", cookie=cookie)[0] == 400
+    assert call(env, "POST", "/api/generate", {"source": "real", "prompt": "x"}, user="public", cookie=a)[0] == 429
 
 
 def test_other_account_and_browser_cannot_inspect_or_control(protected):

@@ -2,7 +2,7 @@
   "publicHost": "CHOOSE-UNIQUE-NAME.eastus.cloudapp.azure.com",
   "acmeEmail": "OPERATOR_EMAIL",
   "proxySecret": "GENERATE_AT_LEAST_32_RANDOM_CHARACTERS_OUTSIDE_THE_REPOSITORY",
-  "visitorAccounts": ["visitor1", "visitor2"],
+  "accessMode": "public",
   "durableStore": "C:/LeanMoE-models/qwen1.5-moe-a2.7b-chat-int8",
   "fastStore": "D:/LeanMoE-models/qwen1.5-moe-a2.7b-chat-int8",
   "manifest": "C:/LeanMoE-private/store-manifest.json",

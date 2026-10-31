@@ -581,11 +581,9 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None, c
                                      not (self.headers.get("Content-Type") or "").startswith("application/json")):
                 return self._json(HTTPStatus.FORBIDDEN, {"error": "same-origin JSON request required"})
             try:
-                conn, response, payload, token = cloud.open(method, path, raw, self.headers.get("Authorization", ""),
-                                                              self.headers.get("Cookie", ""))
+                conn, response, payload, token = cloud.open(method, path, raw, self.headers.get("Cookie", ""))
             except PermissionError as e:
-                return self._json(HTTPStatus.UNAUTHORIZED, {"error": str(e)},
-                                  {"WWW-Authenticate": 'Basic realm="LeanMoE Cloud"'})
+                return self._json(HTTPStatus.CONFLICT, {"error": str(e)})
             except ValueError as e:
                 return self._json(HTTPStatus.BAD_GATEWAY, {"error": str(e)})
             except (OSError, TimeoutError):
@@ -595,8 +593,6 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None, c
                 if token:
                     extra["Set-Cookie"] = (f"{SESSION_COOKIE}={token}; Path=/cloud/; HttpOnly; SameSite=Strict; "
                                            "Max-Age=7200")
-                if response.status == HTTPStatus.UNAUTHORIZED:
-                    extra["WWW-Authenticate"] = 'Basic realm="LeanMoE Cloud"'
                 ctype = response.getheader("Content-Type", "application/json; charset=utf-8")
                 if ctype not in ("application/json; charset=utf-8", "text/event-stream; charset=utf-8"):
                     ctype = "application/json; charset=utf-8"
@@ -625,7 +621,8 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None, c
             if path == "/api/status":
                 status = engine.status()
                 if access is not None:
-                    status["access"] = {"protected": True, "queue": "none", "max_seconds": access.max_seconds}
+                    status["access"] = {"protected": True, "public_demo": access.public_demo,
+                                        "queue": "none", "max_seconds": access.max_seconds}
                     status["limits"]["max_new_tokens"] = access.max_tokens
                     req = engine.active
                     owns_snapshot = (req is not None and req.owner == self.owner and status["active"] is not None
@@ -665,7 +662,7 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None, c
                 length = int(self.headers.get("Content-Length") or 0)
             except ValueError:
                 length = -1
-            if self.headers.get("Transfer-Encoding") or not 0 <= length <= (16_000 if access else 64_000):
+            if self.headers.get("Transfer-Encoding") or not 0 <= length <= (16_000 if access or self.path.startswith("/cloud/api/") else 64_000):
                 # Drain only a small, bounded rejected body so Windows does not
                 # reset the connection before the client receives the refusal.
                 if not self.headers.get('Transfer-Encoding') and 0 < length <= 64_000:
@@ -717,7 +714,8 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None, c
                 if engine.active is not None:
                     return self._json(HTTPStatus.CONFLICT, {"error": "Engine busy. No queue; retry after the current run finishes."})
                 if not access.admit(self.headers["X-LeanMoE-Visitor"]):
-                    return self._json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Three runs per minute per visitor; retry shortly."})
+                    scope = "globally" if access.public_demo else "per visitor"
+                    return self._json(HTTPStatus.TOO_MANY_REQUESTS, {"error": f"Three runs per minute {scope}; retry shortly."})
                 if body.get("source", "real") != "real":
                     return self._json(HTTPStatus.BAD_REQUEST, {"error": "public runs use the real Qwen store only"})
             try:

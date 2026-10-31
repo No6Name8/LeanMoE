@@ -8,7 +8,7 @@
 
 Windows only · Python 3.13 tested · Qwen1.5-MoE-A2.7B-Chat int8
 
-The live demo runs the **same engine and model store on a Windows cloud server**; your browser needs no model download. It requires credentials supplied by the demo owner. In a local dashboard, choose **Execution: Cloud** on Run or Compare; your browser's built-in sign-in prompt authenticates the fixed HTTPS relay. No credential is placed in page code. The local dashboard stays on `127.0.0.1` and does not expose an unauthenticated inference server. On the hosted dashboard, Cloud is selected and Local requires a separate local installation.
+The live demo runs the **same engine and model store on a Windows cloud server**; your browser needs no model download or login. In a local dashboard, choose **Execution: Cloud** on Run or Compare. The public URL admits anyone with the link, with one active job, bounded requests and separate browser sessions. The local dashboard stays on `127.0.0.1`. On the hosted dashboard, Cloud is selected and Local requires a separate local installation.
 
 [How it works](#how-it-works) · [Laptop evidence](#recorded-laptop-results) · [Task-success evaluation](docs/TASK_BENCHMARK.md) · [Cloud results](#cloud-deployment-and-results) · [Verify locally](#verify-without-downloading-the-model) · [Full Qwen setup](#use-the-full-qwen-model) · [Tests and evidence](#tests-and-evidence) · [Ownership and limits](#ownership-and-limits)
 
@@ -67,7 +67,7 @@ These are **recorded**, not live benchmarks: one Windows laptop (Intel Core i5-1
 
 ## Cloud deployment and results
 
-The [authenticated demo](https://leanmoe-demo-1.eastus.cloudapp.azure.com/) runs the real Qwen store and the same engine remotely. Its **Automatic for this machine** profile measures backend RAM and Windows commit headroom; **Constrained adaptation experiment** retains the deliberate laptop-sized settings. The [raw same-VM comparison](results/resource_profile_comparison.json) used the same model, prompt, kernel and thread settings, with two 16-token main repeats per mode:
+The [public demo](https://leanmoe-demo-1.eastus.cloudapp.azure.com/) runs the real Qwen store and the same engine remotely. Its **Automatic for this machine** profile measures backend RAM and Windows commit headroom; **Constrained adaptation experiment** retains the deliberate laptop-sized settings. The [raw same-VM comparison](results/resource_profile_comparison.json) used the same model, prompt, kernel and thread settings, with two 16-token main repeats per mode:
 
 | Existing 16 GiB VM configuration | Actual expert cache | Mean decode tokens/s | Peak sampled working set |
 |---|---:|---:|---:|

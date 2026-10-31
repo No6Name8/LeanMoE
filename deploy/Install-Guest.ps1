@@ -11,9 +11,12 @@ $ErrorActionPreference = 'Stop'
 & "$PSScriptRoot/Install-Prerequisites.ps1" -PythonExe $PythonExe
 if ((Get-FileHash -LiteralPath $CaddyExe -Algorithm SHA256).Hash -ne $CaddySha256) { throw 'Caddy checksum mismatch' }
 if ((Get-CimInstance Win32_OperatingSystem).Caption -notmatch 'Windows Server') { throw 'This script is for the approved VM, not the laptop.' }
-if (-not (Test-Path 'C:\LeanMoE-private\site.json') -or -not (Test-Path 'C:\LeanMoE-private\visitors.caddy')) { throw 'Create the private site config and individual visitor password hashes first.' }
+if (-not (Test-Path 'C:\LeanMoE-private\site.json')) { throw 'Create the private site config first.' }
 Set-Location -LiteralPath $RepoRoot
 $cfg = Get-Content -LiteralPath 'C:\LeanMoE-private\site.json' -Raw | ConvertFrom-Json
+$accessMode = if ($cfg.accessMode) { [string]$cfg.accessMode } else { 'private' }
+if ($accessMode -notin @('private','public')) { throw 'accessMode must be private or public.' }
+if ($accessMode -eq 'private' -and -not (Test-Path 'C:\LeanMoE-private\visitors.caddy')) { throw 'Private mode requires visitor password hashes.' }
 # A git checkout must be clean; an archive must match the SHA-256 recorded when it was built.
 if (Test-Path '.git') { if (git status --porcelain) { throw 'Install from a clean, approved checkout.' } }
 else { throw 'Use a clean Git checkout for initial install; use Publish-Guest.ps1 for pinned GitHub archives.' }
@@ -37,7 +40,8 @@ $env:LEANMOE_MODELS_ROOT = Split-Path -Parent $cfg.durableStore
 & '.\.venv\Scripts\python.exe' scripts/preflight.py --require-model
 if ($LASTEXITCODE) { throw 'preflight failed' }
 $env:LEANMOE_PROXY_SECRET=$cfg.proxySecret; $env:LEANMOE_PUBLIC_HOST=$cfg.publicHost; $env:LEANMOE_ACME_EMAIL=$cfg.acmeEmail
-Invoke-GuestTool 'C:\LeanMoE-tools\caddy.exe' @('validate','--config','deploy/Caddyfile','--adapter','caddyfile') 'guest-caddy'
+$caddyFile = if ($accessMode -eq 'public') { 'deploy/Caddyfile.public' } else { 'deploy/Caddyfile' }
+Invoke-GuestTool 'C:\LeanMoE-tools\caddy.exe' @('validate','--config',$caddyFile,'--adapter','caddyfile') 'guest-caddy'
 $principal = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\LOCAL SERVICE' -LogonType ServiceAccount -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero)
 foreach ($role in @('backend','proxy')) {

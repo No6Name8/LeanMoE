@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(Number(v))) ? "—" : Number(v).toFixed(d);
   const pick = { source: "real", mode: "cached", "cmp-source": "real", location: "local" };
-  const ui = { status: null, run: null, cmp: null, qwenMissing: true, busy: false, connected: false, hostLocation: null };
+  const ui = { status: null, run: null, cmp: null, qwenMissing: true, busy: false, connected: false, hostLocation: null, savedSettings: {} };
   const api = (path, location = pick.location) => location === "cloud" && ui.hostLocation !== "server" ? "/cloud" + path : path;
   const locationName = (location = pick.location) => location === "cloud" ? "cloud server" : "this computer";
 
@@ -106,13 +106,23 @@
     b.addEventListener("click", () => {
       if (b.disabled) return;
       const g = b.dataset.group;
+      if (g === "location" && b.dataset.value !== pick.location) {
+        ui.savedSettings[pick.location] = settings();
+      }
       document.querySelectorAll(`.segmented button[data-group="${g}"]`).forEach((o) => o.setAttribute("aria-checked", String(o === b)));
       pick[g] = b.dataset.value;
       if (g === "location") {
+        const saved = ui.savedSettings[pick.location] || (pick.location === "cloud" ?
+          {profile: "auto", max_new_tokens: 64, budget_gb: 4.0, start_cache_gb: 1.3} : null);
+        if (saved) {
+          $("memory-profile").value = saved.profile; $("max-new").value = saved.max_new_tokens;
+          $("budget").value = saved.budget_gb; $("start-cache").value = saved.start_cache_gb;
+          profileChanged();
+        }
         ui.status = null; ui.connected = false; ui.qwenMissing = true; ui.otherVisitorBusy = false;
         $("execution-help").textContent = pick.location === "cloud" ?
-          "Connecting to the protected cloud server. Your browser may ask for private credentials; no separate login page is needed." :
-          "Local runs on this computer. Cloud requires private credentials and runs on the protected server.";
+          "Connecting to the public cloud demo. No login or model download is needed." :
+          "Local runs on this computer. Cloud runs on the public, bounded server.";
         updateSelection(); loadStatus(); return;
       }
       updateSelection();
@@ -176,7 +186,7 @@
     if ($("memory-profile").value === "constrained") { $("budget").value = "3.5"; $("start-cache").value = "1.2"; }
     $("profile-help").textContent = automatic ?
       "Automatic measures physical RAM and Windows commit headroom at each model load, reserves runtime allocations and safety headroom, then selects the cache. Effective values appear in Run details." :
-      "Explicit application planning budget and expert cache. Constrained adaptation retains the original 3.5 GB / 1.2 GB starting settings. Neither setting limits Windows file cache or total RAM. Requests that do not fit safe headroom are refused.";
+      "Explicit application planning budget and expert cache. Constrained adaptation retains the original 3.5 GB / 1.2 GB starting settings. Public cloud manual requests are limited to 4 GB budget and 1.3 GB cache. Neither setting limits Windows file cache or total RAM. Requests that do not fit safe headroom are refused.";
   }
   $("memory-profile").addEventListener("change", profileChanged);
   profileChanged();
@@ -201,12 +211,15 @@
     let s;
     try {
       const response = await fetch(api("/api/status", requestedLocation), {signal: controller.signal});
-      if (!response.ok) throw new Error(response.status === 401 ? "Cloud sign-in required; use your private credentials in the browser prompt." :
-        response.status === 502 ? "Cloud server unavailable or not running the protected backend." : "Backend status unavailable.");
+      if (!response.ok) {
+        let detail = "Backend status unavailable.";
+        try { detail = (await response.json()).error || detail; } catch (e) { /* empty response */ }
+        throw new Error(detail);
+      }
       s = await response.json();
       if (!s.system || !s.real_store || !s.limits) throw new Error("invalid status");
-      if (requestedLocation === "cloud" && (s.system.execution_location !== "server" || !s.access?.protected))
-        throw new Error("Cloud backend did not confirm protected server execution.");
+      if (requestedLocation === "cloud" && (s.system.execution_location !== "server" || !s.access?.public_demo))
+        throw new Error("Cloud backend did not confirm public server execution.");
       disconnected = false;
     } catch (e) {
       disconnected = true;
@@ -228,20 +241,21 @@
       if (ui.hostLocation === "server") {
         pick.location = "cloud";
         document.querySelectorAll('[data-group="location"]').forEach((b) => b.setAttribute("aria-checked", String(b.dataset.value === "cloud")));
-        $("execution-help").textContent = "Running on the protected cloud server. Local execution requires a local installation; see the project README.";
+        $("execution-help").textContent = "Running on the public cloud server. Local execution requires a local installation; see the project README.";
       }
     }
     ui.connected = true;
     ui.status = s;
     if (pick.location === "cloud") $("execution-help").textContent =
-      "Protected cloud server connected. One active job; no queue. Cloud speedup is not established.";
-    else $("execution-help").textContent = "Running on this computer. Cloud requires private credentials and runs on the protected server.";
+      "Public cloud server connected. One active job; no queue. Cloud speedup is not established.";
+    else $("execution-help").textContent = "Running on this computer. Cloud runs on the public, bounded server.";
     const protectedSite = Boolean(s.access?.protected);
     ui.otherVisitorBusy = protectedSite && s.busy && !s.active;
     $("engine-availability").hidden = !protectedSite || ui.tab === "evidence";
     $("engine-availability").textContent = ui.otherVisitorBusy ? "Engine busy with another visitor. No queue; retry when it is available." :
-      "Protected cloud session. Automatic uses measured machine headroom. Manual/constrained limits: 4 GB budget, 1.3 GB cache. One active job; no queue; 96 tokens per mode, 10 minutes per job. Application budgets do not limit Windows file cache or VM RAM.";
+      "Public cloud demo. Automatic uses measured server headroom. Manual/constrained limits: 4 GB budget, 1.3 GB cache. One active job; no queue; 96 tokens per mode, 10 minutes per job, three starts per minute globally. Application budgets do not limit Windows file cache or VM RAM.";
     $("max-new").max = s.limits.max_new_tokens;
+    if (Number($("max-new").value) > s.limits.max_new_tokens) $("max-new").value = s.limits.max_new_tokens;
     for (const prefix of ["run", "cmp"]) {
       $(prefix + "-advanced").hidden = protectedSite;
       if (protectedSite) $(prefix + "-engine-test").checked = false;

@@ -4,8 +4,11 @@ $ErrorActionPreference = 'Stop'
 $cfg = Get-Content -LiteralPath 'C:\LeanMoE-private\site.json' -Raw | ConvertFrom-Json
 if (($cfg | ConvertTo-Json -Depth 5) -match 'CHOOSE-|GENERATE_|SET_APPROVED|OPERATOR_EMAIL') { throw 'Unconfigured deployment; refusing to start.' }
 $deadline = [DateTimeOffset]::Parse($cfg.shutdownUtc).ToUniversalTime()
+$accessMode = if ($cfg.accessMode) { [string]$cfg.accessMode } else { 'private' }
+if ($accessMode -notin @('private','public')) { throw 'accessMode must be private or public.' }
 $env:LEANMOE_PROXY_SECRET = $cfg.proxySecret
-$env:LEANMOE_VISITOR_ACCOUNTS = $cfg.visitorAccounts -join ','
+$env:LEANMOE_VISITOR_ACCOUNTS = if ($accessMode -eq 'public') { 'public' } else { $cfg.visitorAccounts -join ',' }
+$env:LEANMOE_ACCESS_MODE = $accessMode
 $env:LEANMOE_PUBLIC_HOST = $cfg.publicHost
 $env:LEANMOE_ACME_EMAIL = $cfg.acmeEmail
 $env:OPENBLAS_NUM_THREADS = '4'
@@ -48,7 +51,8 @@ try {
         if ($Role -eq 'backend') {
             $child = Start-Process -FilePath $PythonExe -ArgumentList '-m','src.dashboard','--execution-location','server','--public-origin',("https://"+$cfg.publicHost) -WorkingDirectory $RepoRoot -WindowStyle Hidden -PassThru
         } else {
-            $child = Start-Process -FilePath 'C:\LeanMoE-tools\caddy.exe' -ArgumentList 'run','--config',"$RepoRoot\deploy\Caddyfile",'--adapter','caddyfile' -WorkingDirectory $RepoRoot -WindowStyle Hidden -PassThru
+            $caddyFile = if ($accessMode -eq 'public') { 'Caddyfile.public' } else { 'Caddyfile' }
+            $child = Start-Process -FilePath 'C:\LeanMoE-tools\caddy.exe' -ArgumentList 'run','--config',"$RepoRoot\deploy\$caddyFile",'--adapter','caddyfile' -WorkingDirectory $RepoRoot -WindowStyle Hidden -PassThru
         }
         while (-not $child.WaitForExit(1000) -and [DateTimeOffset]::UtcNow -lt $deadline) { }
         if (-not $child.HasExited) { taskkill.exe /PID $child.Id /T /F | Out-Null }

@@ -39,8 +39,12 @@ def main() -> int:
         if args.execution_location != "server":
             ap.error("--public-origin requires --execution-location server")
         try:
+            mode = os.environ.get("LEANMOE_ACCESS_MODE", "private")
+            if mode not in ("private", "public"):
+                ap.error("LEANMOE_ACCESS_MODE must be private or public")
             access = ProxyAccess(args.public_origin, os.environ.get("LEANMOE_PROXY_SECRET", ""),
-                                 frozenset(filter(None, os.environ.get("LEANMOE_VISITOR_ACCOUNTS", "").split(","))))
+                                 frozenset(filter(None, os.environ.get("LEANMOE_VISITOR_ACCOUNTS", "").split(","))),
+                                 public_demo=mode == "public")
         except ValueError as e:
             ap.error(str(e))
     port = DEFAULT_PORT if args.port is None else args.port

@@ -6,8 +6,18 @@ if (-not $Apply) { Write-Output 'Plan only: download exact commit, verify/tests,
 if ((Get-CimInstance Win32_OperatingSystem).Caption -notmatch 'Windows Server') { throw 'Cloud guest only.' }
 $cfg = Get-Content C:\LeanMoE-private\site.json -Raw | ConvertFrom-Json
 if ([DateTimeOffset]::Parse($cfg.shutdownUtc) -le [DateTimeOffset]::UtcNow) { throw 'Approved deadline has passed.' }
-$headers = @{ Host='127.0.0.1:8770'; 'X-LeanMoE-Proxy-Key'=$cfg.proxySecret; 'X-LeanMoE-Visitor'=$cfg.visitorAccounts[0] }
-$status = Invoke-RestMethod http://127.0.0.1:8770/api/status -Headers $headers
+function Get-LiveStatus {
+    # During a private-to-public release the old process still expects a
+    # named visitor; after the switch it expects the fixed public identity.
+    foreach ($visitor in @('public') + @($cfg.visitorAccounts)) {
+        if (-not $visitor) { continue }
+        $headers = @{ Host='127.0.0.1:8770'; 'X-LeanMoE-Proxy-Key'=$cfg.proxySecret; 'X-LeanMoE-Visitor'=$visitor }
+        try { return Invoke-RestMethod http://127.0.0.1:8770/api/status -Headers $headers }
+        catch { }
+    }
+    throw 'Backend status unavailable with configured proxy identities.'
+}
+$status = Get-LiveStatus
 if ($status.busy) { throw 'Engine busy; do not deploy over a visitor job.' }
 $releaseBase = 'C:\LeanMoE-releases'
 $release = [IO.Path]::GetFullPath((Join-Path $releaseBase ('LeanMoE-'+$Commit)))
@@ -29,10 +39,13 @@ Invoke-GuestTool $PythonExe @('-m','pytest','-q') 'release-tests'
 $env:LEANMOE_MODELS_ROOT = Split-Path -Parent $cfg.fastStore
 Invoke-GuestTool $PythonExe @('scripts/preflight.py','--require-model') 'release-preflight'
 $env:LEANMOE_PROXY_SECRET=$cfg.proxySecret; $env:LEANMOE_PUBLIC_HOST=$cfg.publicHost; $env:LEANMOE_ACME_EMAIL=$cfg.acmeEmail
-Invoke-GuestTool 'C:\LeanMoE-tools\caddy.exe' @('validate','--config','deploy/Caddyfile','--adapter','caddyfile') 'release-caddy'
+$accessMode = if ($cfg.accessMode) { [string]$cfg.accessMode } else { 'private' }
+if ($accessMode -notin @('private','public')) { throw 'accessMode must be private or public.' }
+$caddyFile = if ($accessMode -eq 'public') { 'deploy/Caddyfile.public' } else { 'deploy/Caddyfile' }
+Invoke-GuestTool 'C:\LeanMoE-tools\caddy.exe' @('validate','--config',$caddyFile,'--adapter','caddyfile') 'release-caddy'
 # Recheck immediately before switching. Requests during this brief maintenance
 # window can fail; the authenticated proxy never serves an unprotected backend.
-if ((Invoke-RestMethod http://127.0.0.1:8770/api/status -Headers $headers).busy) { throw 'Engine became busy; retry later.' }
+if ((Get-LiveStatus).busy) { throw 'Engine became busy; retry later.' }
 $backup = 'C:\LeanMoE-private\previous-tasks.json'
 @('backend','proxy') | ForEach-Object { Get-ScheduledTask -TaskName ('LeanMoE-'+$_) | Select-Object TaskName,Actions } | ConvertTo-Json -Depth 8 | Set-Content $backup
 foreach ($role in @('backend','proxy')) { Stop-ScheduledTask -TaskName ('LeanMoE-'+$role) }
