@@ -1,0 +1,23 @@
+{
+  "role": "Manual answer audit of the earlier three-task harness pilot only; not a full evaluation",
+  "raw_artifact": "task_benchmark_pilot_20261030-134509.json",
+  "raw_artifact_sha256": "229e2bb748d2fa9064cd96598b2c4cdea6935011b7bb992954262be101f998b4",
+  "frozen_task_spec_sha256": "0b7a2713200513a5f4cc62fc582028e1a93ee15c0c461b41448ce45d2f087a35",
+  "basis": "Each of the twelve full generated texts was inspected against the frozen expected answer; automatic scores in the raw artifact were not changed.",
+  "assessments": [
+    {"task_id": "arith_add", "mode": "cached", "kind": "first_request", "assessment": "correct", "reason": "Answer: 936; 347 + 589 = 936."},
+    {"task_id": "arith_add", "mode": "cached", "kind": "warm_repeat", "assessment": "correct", "reason": "Answer: 936; 347 + 589 = 936."},
+    {"task_id": "arith_add", "mode": "mmap", "kind": "first_request", "assessment": "correct", "reason": "Answer: 936; 347 + 589 = 936."},
+    {"task_id": "arith_add", "mode": "mmap", "kind": "warm_repeat", "assessment": "correct", "reason": "Answer: 936; 347 + 589 = 936."},
+    {"task_id": "eq_quadratic", "mode": "mmap", "kind": "first_request", "assessment": "correct", "reason": "Answer: x = 2, x = 3; (x - 2)(x - 3) = x^2 - 5x + 6."},
+    {"task_id": "eq_quadratic", "mode": "mmap", "kind": "warm_repeat", "assessment": "correct", "reason": "Answer: x = 2, x = 3; both roots match."},
+    {"task_id": "eq_quadratic", "mode": "cached", "kind": "first_request", "assessment": "correct", "reason": "Answer: x = 2, x = 3; both roots match."},
+    {"task_id": "eq_quadratic", "mode": "cached", "kind": "warm_repeat", "assessment": "correct", "reason": "Answer: x = 2, x = 3; both roots match."},
+    {"task_id": "read_train", "mode": "cached", "kind": "first_request", "assessment": "correct", "reason": "Answer: B.; Train A takes 2 h 25 min and Train B takes 2 h 05 min."},
+    {"task_id": "read_train", "mode": "cached", "kind": "warm_repeat", "assessment": "correct", "reason": "Answer: B.; Train B has the shorter journey."},
+    {"task_id": "read_train", "mode": "mmap", "kind": "first_request", "assessment": "correct", "reason": "Answer: B.; Train B has the shorter journey."},
+    {"task_id": "read_train", "mode": "mmap", "kind": "warm_repeat", "assessment": "correct", "reason": "Answer: B.; Train B has the shorter journey."}
+  ],
+  "disagreements_with_automatic_scores": 0,
+  "limitations": "This audit covers only three fixed pilot tasks and twelve responses, not the remaining nine tasks or general model quality."
+}

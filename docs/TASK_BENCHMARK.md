@@ -6,8 +6,21 @@ This is a small, fixed 12-task check of Qwen1.5-MoE-A2.7B-Chat answers on one Wi
 
 - [Task specification](../configs/tasks/task_benchmark_v1.json): twelve tasks in fixed order, expected answers, answer-extraction/scoring rules, predictions, greedy decoding, 128 output tokens, 512-token context, 120-second success limit and 300-second per-request cancellation target. The [specification lock](../results/task_benchmark_spec_lock.json) records its LF-normalized SHA-256 (`0b7a2713200513a5f4cc62fc582028e1a93ee15c0c461b41448ce45d2f087a35`). The runner refuses a mismatched spec.
 - The untracked specification and original scorer existed on disk before the [three-task pilot](../results/task_benchmark_pilot_20261030-134509.json), whose embedded specification hash, design and included tasks match. File timestamps support that order, but cannot independently prove when untracked content was authored. The first Git commit locking them is `ba037e065ef0f851c9594a22ea0a2248b9c32b0a`, **after** the pilot and **before** any new evaluation inference.
-- The pilot is a **harness check**, not the twelve-task outcome: three tasks, both modes, each with a first request and warm repeat. It recorded three rule-correct, EOS-completed answers in each mode for each request kind. It says little about the unrun tasks.
+- The pilot is a **harness check**, not the twelve-task outcome: three tasks, both modes, each with a first request and warm repeat. It recorded three rule-correct, EOS-completed answers in each mode for each request kind. All twelve pilot texts were separately checked against the fixed answers in the [manual pilot audit](../results/task_benchmark_pilot_manual_review.json), with no disagreements. It says little about the unrun tasks.
 - After the pilot, the scorer's `Answer:` detector was anchored to a standalone line to avoid false passes on `Nonanswer:`. The task file, expected values and numeric/choice rules remain unchanged. The runner gained a physical-RAM guard, a wall-time ceiling, partial-run preservation and separate prefill/decode fields. These later changes are not represented as preregistered.
+
+## Recorded pilot only
+
+The following figures were recalculated from the [raw pilot](../results/task_benchmark_pilot_20261030-134509.json). Each denominator is **three fixed pilot tasks** for that mode and request kind. A child loads once, then handles the first request and its warm repeat. Memory is the maximum sampled over each entire child process; the values are not a common memory allowance or a system-wide RAM measurement.
+
+| Mode | Request | Correct / completed | Correct within 120 s | Mean request latency | Mean load per child | Peak private / working set |
+|---|---|---:|---:|---:|---:|---:|
+| LeanMoE | First | 3/3 | 3/3 | 13.7 s | 4.94 s | 2.84 / 2.58 GB |
+| LeanMoE | Warm repeat | 3/3 | 3/3 | 13.2 s | 4.94 s | 2.84 / 2.58 GB |
+| Windows paging | First | 3/3 | 3/3 | 36.8 s | 2.91 s | 0.49 / 5.67 GB |
+| Windows paging | Warm repeat | 3/3 | 3/3 | 46.7 s | 2.91 s | 0.49 / 5.67 GB |
+
+All pilot responses stopped at EOS. [Manual review](../results/task_benchmark_pilot_manual_review.json) agreed with all twelve automatic scores; none were incorrect, late, truncated or ambiguous. The two modes emitted identical token IDs for each pilot task and request kind. That token agreement is an execution check, **not** the basis for correctness. The 12-task study remains unfinished.
 
 ## Run on a laptop with the separately obtained store
 
