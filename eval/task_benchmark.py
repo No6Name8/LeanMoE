@@ -123,6 +123,10 @@ def child(spec_path: Path) -> None:
     rt = G.RuntimeConfig.load(CONFIG)
     rt = replace(rt, prefetch=True, int8_kernel="fused", max_seq=d["max_seq"], memory_budget_gb=d["memory_budget_gb"])
     store = rt.store_dir
+    store_bytes = (store / "store.json").read_bytes()
+    store_source = json.loads(store_bytes)["source"]
+    record.update({"store_manifest_sha256": hashlib.sha256(store_bytes).hexdigest(),
+                   "store_model": store_source["repo_id"], "store_revision": store_source["revision"]})
     tok = load_tokenizer(store)
     prompt_ids = tok.encode(ChatTemplate.for_store(store).user_prompt(spec["prompt"])).ids
     eos = eos_ids_for(tok)
@@ -255,8 +259,10 @@ def summarize(data: dict, manual: dict | None = None) -> dict:
     out: dict = {"by_mode": {}, "consistency": {}}
     for mode in ("cached", "mmap"):
         mruns = [r for r in runs if r["mode"] == mode]
-        failed = [r for r in mruns if r.get("error")]
+        skipped = [r for r in mruns if str(r.get("error", "")).startswith("skipped:")]
+        failed = [r for r in mruns if r.get("error") and r not in skipped]
         m = {"name": MODE_NAMES[mode], "runs": len(mruns), "failed_runs": len(failed),
+             "skipped_before_inference": len(skipped),
              "load_s": [round(r["load_s"], 2) for r in mruns if "load_s" in r]}  # fmt: skip
         for kind in ("first_request", "warm_repeat"):
             reqs = [(r, q) for r in mruns for q in r.get("requests", []) if q.get("kind") == kind and "score" in q]
@@ -347,6 +353,9 @@ def main() -> None:
     label = "pilot" if args.pilot else "full"
     data = {"design": design, "task_file": TASK_FILE.name, "task_file_sha256": digest, "label": label,
             "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "scorer_sha256": hashlib.sha256((REPO_ROOT / "eval" / "task_scoring.py").read_bytes().replace(b"\r\n", b"\n")).hexdigest(),
+            "runner_sha256": hashlib.sha256(Path(__file__).read_bytes().replace(b"\r\n", b"\n")).hexdigest(),
+            "code_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True).strip(),
             "tasks": tasks, "runs": []}  # fmt: skip
     stamp = time.strftime("%Y%m%d-%H%M%S")
     out = RESULTS_DIR / f"task_benchmark_{label}_{stamp}.json"

@@ -70,6 +70,13 @@ class Summary(unittest.TestCase):
         self.assertIn("physical", memory_guard_reason({"commit_available_gb": 8, "physical_available_gb": 0.8}, design))
         self.assertIn("commit", memory_guard_reason({"commit_available_gb": 2, "physical_available_gb": 4}, design))
 
+    def test_preflight_skip_is_not_a_failed_inference_attempt(self):
+        self.data["runs"].append({"task_id": "d", "mode": "cached", "error": "skipped: low RAM", "requests": []})
+        s = summarize(self.data)["by_mode"]["cached"]
+        self.assertEqual(s["skipped_before_inference"], 1)
+        self.assertEqual(s["failed_runs"], 0)
+        self.assertEqual(s["first_request"]["attempted"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()
