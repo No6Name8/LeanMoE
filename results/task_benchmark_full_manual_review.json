@@ -1,0 +1,396 @@
+{
+  "role": "Separate manual audit of all 48 responses in the full frozen 12-task evaluation; automatic scores remain in the raw artifact",
+  "raw_artifact": "task_benchmark_full_20261031-043821.json",
+  "raw_artifact_sha256": "bd42e7baaf0a42ae38aeee0992b7640b02ca728bdc2e28aafc32af439db0ac09",
+  "frozen_task_spec_sha256": "0b7a2713200513a5f4cc62fc582028e1a93ee15c0c461b41448ce45d2f087a35",
+  "basis": "Each generated text was compared to the frozen question and expected answer. Within each task, all four texts and token-ID sequences are identical; each response is assessed separately here.",
+  "assessments": [
+    {
+      "task_id": "arith_add",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "936 is the sum of 347 and 589."
+    },
+    {
+      "task_id": "arith_add",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "936 is the sum of 347 and 589."
+    },
+    {
+      "task_id": "arith_add",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "936 is the sum of 347 and 589."
+    },
+    {
+      "task_id": "arith_add",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "936 is the sum of 347 and 589."
+    },
+    {
+      "task_id": "arith_mul",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "17,052 differs from 487 × 36 = 17,532."
+    },
+    {
+      "task_id": "arith_mul",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "17,052 differs from 487 × 36 = 17,532."
+    },
+    {
+      "task_id": "arith_mul",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "17,052 differs from 487 × 36 = 17,532."
+    },
+    {
+      "task_id": "arith_mul",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "17,052 differs from 487 × 36 = 17,532."
+    },
+    {
+      "task_id": "arith_multi",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "1101 differs from 23 × 47 − 389 = 692."
+    },
+    {
+      "task_id": "arith_multi",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "1101 differs from 23 × 47 − 389 = 692."
+    },
+    {
+      "task_id": "arith_multi",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "1101 differs from 23 × 47 − 389 = 692."
+    },
+    {
+      "task_id": "arith_multi",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "1101 differs from 23 × 47 − 389 = 692."
+    },
+    {
+      "task_id": "eq_linear",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "x = 6 satisfies 3x + 7 = 25."
+    },
+    {
+      "task_id": "eq_linear",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "x = 6 satisfies 3x + 7 = 25."
+    },
+    {
+      "task_id": "eq_linear",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "x = 6 satisfies 3x + 7 = 25."
+    },
+    {
+      "task_id": "eq_linear",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "x = 6 satisfies 3x + 7 = 25."
+    },
+    {
+      "task_id": "eq_quadratic",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "The two roots 2 and 3 satisfy x² − 5x + 6 = 0."
+    },
+    {
+      "task_id": "eq_quadratic",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "The two roots 2 and 3 satisfy x² − 5x + 6 = 0."
+    },
+    {
+      "task_id": "eq_quadratic",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "The two roots 2 and 3 satisfy x² − 5x + 6 = 0."
+    },
+    {
+      "task_id": "eq_quadratic",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "The two roots 2 and 3 satisfy x² − 5x + 6 = 0."
+    },
+    {
+      "task_id": "eq_hard",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "The response gives 4 and −5; the roots are 2.5 and −4."
+    },
+    {
+      "task_id": "eq_hard",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "The response gives 4 and −5; the roots are 2.5 and −4."
+    },
+    {
+      "task_id": "eq_hard",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "The response gives 4 and −5; the roots are 2.5 and −4."
+    },
+    {
+      "task_id": "eq_hard",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "incorrect",
+      "manual_assessment": "incorrect",
+      "reason": "The response gives 4 and −5; the roots are 2.5 and −4."
+    },
+    {
+      "task_id": "fact_capital",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "Canberra is the capital of Australia; the extra sentence does not change the answer."
+    },
+    {
+      "task_id": "fact_capital",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "Canberra is the capital of Australia; the extra sentence does not change the answer."
+    },
+    {
+      "task_id": "fact_capital",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "Canberra is the capital of Australia; the extra sentence does not change the answer."
+    },
+    {
+      "task_id": "fact_capital",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "Canberra is the capital of Australia; the extra sentence does not change the answer."
+    },
+    {
+      "task_id": "fact_symbol",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "manual_review",
+      "manual_assessment": "correct",
+      "reason": "Na is the chemical symbol for sodium; the answer lacks the requested Answer: line."
+    },
+    {
+      "task_id": "fact_symbol",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "manual_review",
+      "manual_assessment": "correct",
+      "reason": "Na is the chemical symbol for sodium; the answer lacks the requested Answer: line."
+    },
+    {
+      "task_id": "fact_symbol",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "manual_review",
+      "manual_assessment": "correct",
+      "reason": "Na is the chemical symbol for sodium; the answer lacks the requested Answer: line."
+    },
+    {
+      "task_id": "fact_symbol",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "manual_review",
+      "manual_assessment": "correct",
+      "reason": "Na is the chemical symbol for sodium; the answer lacks the requested Answer: line."
+    },
+    {
+      "task_id": "fact_moon",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "1969 is the year people first walked on the Moon."
+    },
+    {
+      "task_id": "fact_moon",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "1969 is the year people first walked on the Moon."
+    },
+    {
+      "task_id": "fact_moon",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "1969 is the year people first walked on the Moon."
+    },
+    {
+      "task_id": "fact_moon",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "1969 is the year people first walked on the Moon."
+    },
+    {
+      "task_id": "read_marbles",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "manual_review",
+      "manual_assessment": "incorrect",
+      "reason": "The response says 6 and omits the four newly bought red marbles; 3 + (5 − 2) + 4 = 10."
+    },
+    {
+      "task_id": "read_marbles",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "manual_review",
+      "manual_assessment": "incorrect",
+      "reason": "The response says 6 and omits the four newly bought red marbles; 3 + (5 − 2) + 4 = 10."
+    },
+    {
+      "task_id": "read_marbles",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "manual_review",
+      "manual_assessment": "incorrect",
+      "reason": "The response says 6 and omits the four newly bought red marbles; 3 + (5 − 2) + 4 = 10."
+    },
+    {
+      "task_id": "read_marbles",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "manual_review",
+      "manual_assessment": "incorrect",
+      "reason": "The response says 6 and omits the four newly bought red marbles; 3 + (5 − 2) + 4 = 10."
+    },
+    {
+      "task_id": "read_train",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "B takes 2 h 05 min; A takes 2 h 25 min."
+    },
+    {
+      "task_id": "read_train",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "B takes 2 h 05 min; A takes 2 h 25 min."
+    },
+    {
+      "task_id": "read_train",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "B takes 2 h 05 min; A takes 2 h 25 min."
+    },
+    {
+      "task_id": "read_train",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "correct",
+      "manual_assessment": "correct",
+      "reason": "B takes 2 h 05 min; A takes 2 h 25 min."
+    },
+    {
+      "task_id": "read_oldest",
+      "mode": "mmap",
+      "kind": "first_request",
+      "automatic_score": "manual_review",
+      "manual_assessment": "correct",
+      "reason": "Lina is 41, older than Omar (34) and Sami (29); the answer lacks the requested standalone Answer: line."
+    },
+    {
+      "task_id": "read_oldest",
+      "mode": "mmap",
+      "kind": "warm_repeat",
+      "automatic_score": "manual_review",
+      "manual_assessment": "correct",
+      "reason": "Lina is 41, older than Omar (34) and Sami (29); the answer lacks the requested standalone Answer: line."
+    },
+    {
+      "task_id": "read_oldest",
+      "mode": "cached",
+      "kind": "first_request",
+      "automatic_score": "manual_review",
+      "manual_assessment": "correct",
+      "reason": "Lina is 41, older than Omar (34) and Sami (29); the answer lacks the requested standalone Answer: line."
+    },
+    {
+      "task_id": "read_oldest",
+      "mode": "cached",
+      "kind": "warm_repeat",
+      "automatic_score": "manual_review",
+      "manual_assessment": "correct",
+      "reason": "Lina is 41, older than Omar (34) and Sami (29); the answer lacks the requested standalone Answer: line."
+    }
+  ],
+  "disagreements_with_automatic_scores": 0,
+  "manual_review_resolutions": 12,
+  "limitations": "Twelve fixed short tasks on one model and laptop; no general model-quality, energy, or cost claim."
+}

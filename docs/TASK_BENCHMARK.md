@@ -9,7 +9,37 @@ This is a small, fixed 12-task check of Qwen1.5-MoE-A2.7B-Chat answers on one Wi
 - The pilot is a **harness check**, not the twelve-task outcome: three tasks, both modes, each with a first request and warm repeat. It recorded three rule-correct, EOS-completed answers in each mode for each request kind. All twelve pilot texts were separately checked against the fixed answers in the [manual pilot audit](../results/task_benchmark_pilot_manual_review.json), with no disagreements. It says little about the unrun tasks.
 - After the pilot, the scorer's `Answer:` detector was anchored to a standalone line to avoid false passes on `Nonanswer:`. The task file, expected values and numeric/choice rules remain unchanged. The runner gained a physical-RAM guard, a wall-time ceiling, partial-run preservation and separate prefill/decode fields. These later changes are not represented as preregistered.
 
-## Recorded pilot only
+## Full 12-task result
+
+The [raw full run](../results/task_benchmark_full_20261031-043821.json) used the fixed specification and hash above. It completed all 24 task-mode children in 26.0 minutes, one at a time, alternating mode order by task. All 48 requests stopped at EOS; none timed out or hit the token limit. The [separate manual audit](../results/task_benchmark_full_manual_review.json) assessed every generated text against the frozen expected answer. Each task produced identical text and token IDs across both modes and both request kinds. That consistency does **not** establish correctness.
+
+Each correctness denominator below is **12 fixed tasks** for one mode and request kind. The manual audit found eight correct and four incorrect in every group; all eight correct answers arrived within the fixed 120-second request limit. The automatic scorer recorded six correct, three incorrect and three manual-review cases per group. Manual review resolved two of those cases as correct (`Na`, `Lina`) and one as incorrect (marbles: `6` rather than `10`); it found no disagreement with a definite automatic correct/incorrect score. The other wrong answers were multiplication (`17,052` rather than `17,532`), multistep arithmetic (`1101` rather than `692`) and the harder quadratic (`4, −5` rather than `2.5, −4`). No scoring rule was changed after seeing these answers.
+
+| Mode | Request | Manually correct / completed | Correct within 120 s | Median request latency (range) | Median load per child | Max sampled private / working set |
+|---|---|---:|---:|---:|---:|---:|
+| LeanMoE | First | 8/12 | 8/12 | 14.9 s (9.0–27.6) | 4.8 s | 2.836 / 2.565 GB |
+| LeanMoE | Warm repeat | 8/12 | 8/12 | 14.1 s (8.2–24.9) | 4.8 s | 2.836 / 2.565 GB |
+| Windows paging | First | 8/12 | 8/12 | 38.0 s (29.1–55.4) | 2.8 s | 0.493 / 5.352 GB |
+| Windows paging | Warm repeat | 8/12 | 8/12 | 46.0 s (35.0–70.2) | 2.8 s | 0.493 / 5.352 GB |
+
+The request latency excludes model load; the first request's load and request times can be added for that child's total after startup. Load is reported once per child, so the warm repeat does not reload. The memory columns are the maximum sampled across that mode's 12 children, **not** an equal-memory comparison: Windows paging had a larger working set. A fresh child is not a cold Windows file cache. These results cover twelve short tasks, one model and one laptop; they do not establish general quality or a universal latency advantage.
+
+| Task | LeanMoE first / warm | Paging first / warm | Manual result in all four responses |
+|---|---:|---:|---|
+| `arith_add` | 11.7 / 10.6 s | 31.8 / 39.9 s | Correct |
+| `arith_mul` | 14.7 / 13.5 s | 39.4 / 45.3 s | Incorrect |
+| `arith_multi` | 13.0 / 11.7 s | 32.2 / 40.8 s | Incorrect |
+| `eq_linear` | 12.7 / 11.4 s | 36.8 / 44.3 s | Correct |
+| `eq_quadratic` | 15.1 / 14.7 s | 37.4 / 46.7 s | Correct |
+| `eq_hard` | 17.7 / 16.4 s | 45.4 / 56.4 s | Incorrect |
+| `fact_capital` | 17.8 / 17.8 s | 44.6 / 48.5 s | Correct |
+| `fact_symbol` | 9.0 / 8.2 s | 29.1 / 35.0 s | Correct after manual review |
+| `fact_moon` | 12.1 / 12.0 s | 33.3 / 37.2 s | Correct |
+| `read_marbles` | 27.6 / 24.9 s | 55.4 / 70.2 s | Incorrect after manual review |
+| `read_train` | 16.9 / 15.0 s | 38.6 / 48.6 s | Correct |
+| `read_oldest` | 18.9 / 16.3 s | 42.6 / 52.6 s | Correct after manual review |
+
+## Earlier three-task pilot
 
 The following figures were recalculated from the [raw pilot](../results/task_benchmark_pilot_20261030-134509.json). Each denominator is **three fixed pilot tasks** for that mode and request kind. A child loads once, then handles the first request and its warm repeat. Memory is the maximum sampled over each entire child process; the values are not a common memory allowance or a system-wide RAM measurement.
 
@@ -20,7 +50,7 @@ The following figures were recalculated from the [raw pilot](../results/task_ben
 | Windows paging | First | 3/3 | 3/3 | 36.8 s | 2.91 s | 0.49 / 5.67 GB |
 | Windows paging | Warm repeat | 3/3 | 3/3 | 46.7 s | 2.91 s | 0.49 / 5.67 GB |
 
-All pilot responses stopped at EOS. [Manual review](../results/task_benchmark_pilot_manual_review.json) agreed with all twelve automatic scores; none were incorrect, late, truncated or ambiguous. The two modes emitted identical token IDs for each pilot task and request kind. That token agreement is an execution check, **not** the basis for correctness. The 12-task study remains unfinished.
+All pilot responses stopped at EOS. [Manual review](../results/task_benchmark_pilot_manual_review.json) agreed with all twelve automatic scores; none were incorrect, late, truncated or ambiguous. The two modes emitted identical token IDs for each pilot task and request kind. That token agreement is an execution check, **not** the basis for correctness. The full run above is separate from this earlier pilot.
 
 ## Run on a laptop with the separately obtained store
 

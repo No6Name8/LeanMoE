@@ -1,0 +1,3183 @@
+{
+ "design": {
+  "generation": "greedy (argmax), chat template of the store, stream_generate, stop at <|im_end|> / <|endoftext|>",
+  "max_new_tokens": 128,
+  "max_seq": 512,
+  "time_limit_s": 120,
+  "time_limit_definition": "per request: from the start of stream_generate (prefill included) to the final token; model load excluded. A request over the limit still runs to completion and is scored, but does not count as 'correct within the time limit'.",
+  "hard_cap_s": 300,
+  "hard_cap_definition": "safety stop: a request still running after 300 s is cancelled at the next token boundary and scored as not correct (status 'cancelled').",
+  "memory_budget_gb": 3.0,
+  "memory_budget_note": "LeanMoE cache sized by the engine's normal budget calculation (budget minus estimated rest of process), as in eval/config_compare.py; the memory-mapped mode uses the same budget value for its startup guard.",
+  "openblas_threads": "engine default (4)",
+  "process_layout": "one fresh child process per (task, mode): load the model, request 1 = 'first request' (first request after load), request 2 = 'warm repeat' (the same prompt again in the same process). Scores and timings of the two are reported separately, never averaged together.",
+  "order": "tasks in the listed order; LeanMoE first for even task positions (0, 2, ...), Windows paging first for odd positions; one process at a time",
+  "prompt_suffix": "\n\nKeep your reply short. End with a final line of the form: Answer: <your answer>"
+ },
+ "task_file": "task_benchmark_v1.json",
+ "task_file_sha256": "0b7a2713200513a5f4cc62fc582028e1a93ee15c0c461b41448ce45d2f087a35",
+ "label": "full",
+ "started_utc": "2026-10-31T01:38:21Z",
+ "scorer_sha256": "35c3b11cbca7f979912b9d87315b3470c030c3ac77ba550eae843bac2c41c0b9",
+ "runner_sha256": "017f404aad3908cd40d1b97a71f84d1ca0eaf10855b4db73b09dd953f3329462",
+ "code_commit": "5cb756122645c29d102f60e02e8167f87dcf2e7a",
+ "tasks": [
+  {
+   "id": "arith_add",
+   "category": "arithmetic",
+   "question": "What is 347 + 589?",
+   "expected": 936,
+   "rule": "last_number",
+   "prediction": "correct"
+  },
+  {
+   "id": "arith_mul",
+   "category": "arithmetic",
+   "question": "What is 487 \u00d7 36?",
+   "expected": 17532,
+   "rule": "last_number",
+   "prediction": "uncertain: a differently worded 487 x 36 prompt was answered 17,052 in an earlier streaming check"
+  },
+  {
+   "id": "arith_multi",
+   "category": "arithmetic",
+   "question": "Compute 23 \u00d7 47 \u2212 389.",
+   "expected": 692,
+   "rule": "last_number",
+   "prediction": "wrong"
+  },
+  {
+   "id": "eq_linear",
+   "category": "equation",
+   "question": "Solve for x: 3x + 7 = 25.",
+   "expected": 6,
+   "rule": "last_number",
+   "prediction": "correct"
+  },
+  {
+   "id": "eq_quadratic",
+   "category": "equation",
+   "question": "Find both solutions of x^2 \u2212 5x + 6 = 0.",
+   "expected": [
+    2,
+    3
+   ],
+   "rule": "root_set",
+   "prediction": "uncertain: the model factored a different quadratic wrongly in an earlier dashboard check"
+  },
+  {
+   "id": "eq_hard",
+   "category": "equation",
+   "question": "Find both solutions of 2x^2 + 3x \u2212 20 = 0.",
+   "expected": [
+    2.5,
+    -4
+   ],
+   "rule": "root_set",
+   "prediction": "wrong"
+  },
+  {
+   "id": "fact_capital",
+   "category": "factual",
+   "question": "What is the capital city of Australia?",
+   "expected": "Canberra",
+   "rule": "choice",
+   "options": [
+    "Canberra",
+    "Sydney",
+    "Melbourne"
+   ],
+   "prediction": "correct"
+  },
+  {
+   "id": "fact_symbol",
+   "category": "factual",
+   "question": "What is the chemical symbol for sodium?",
+   "expected": "Na",
+   "rule": "choice",
+   "options": [
+    "Na",
+    "S",
+    "So",
+    "Sd",
+    "N"
+   ],
+   "case_sensitive": true,
+   "prediction": "correct"
+  },
+  {
+   "id": "fact_moon",
+   "category": "factual",
+   "question": "In which year did people first walk on the Moon?",
+   "expected": 1969,
+   "rule": "last_number",
+   "prediction": "correct"
+  },
+  {
+   "id": "read_marbles",
+   "category": "reading",
+   "question": "Read the passage and answer the question.\nPassage: Ana has 3 red marbles and 5 blue marbles. She gives 2 blue marbles to Ben. Then she buys 4 red marbles.\nQuestion: How many marbles does Ana have now?",
+   "expected": 10,
+   "rule": "last_number",
+   "prediction": "uncertain"
+  },
+  {
+   "id": "read_train",
+   "category": "reading",
+   "question": "Read the timetable and answer the question.\nTrain A: departs 09:15, arrives 11:40.\nTrain B: departs 10:05, arrives 12:10.\nQuestion: Which train has the shorter journey time? Answer with A or B.",
+   "expected": "B",
+   "rule": "choice",
+   "options": [
+    "B",
+    "A"
+   ],
+   "case_sensitive": true,
+   "prediction": "wrong (journeys 2 h 25 min and 2 h 05 min; needs time subtraction)"
+  },
+  {
+   "id": "read_oldest",
+   "category": "reading",
+   "question": "Read the list and answer the question.\nOmar: 34 years old\nLina: 41 years old\nSami: 29 years old\nQuestion: Who is the oldest?",
+   "expected": "Lina",
+   "rule": "choice",
+   "options": [
+    "Lina",
+    "Omar",
+    "Sami"
+   ],
+   "prediction": "correct"
+  }
+ ],
+ "runs": [
+  {
+   "task_id": "arith_add",
+   "category": "arithmetic",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 3.219931136,
+    "commit_available_gb": 12.058112,
+    "commit_limit_gb": 20.463304704
+   },
+   "child_wall_s": 31.041700300003868,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.829869056,
+   "child_peak_working_set_gb": 2.540838912,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130756608,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 5.793344999998226,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.553192448,
+   "prompt_tokens": 51,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 11.73548750000191,
+     "time_to_first_token_s": 8.381056199999875,
+     "decode_tokens_per_s": 1.7933618531547437,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      24,
+      18,
+      21
+     ],
+     "text": "Answer: 936",
+     "private_after_gb": 2.61476352,
+     "expert_stats": {
+      "cache_hits": 2,
+      "demand_reads": 321,
+      "prefetch_hits": 1315,
+      "expert_read_seconds": 2.6610581000277307
+     },
+     "prefill_forward_s": 8.381056199999875,
+     "decode_forward_s": 2.807006100018043,
+     "decode_wall_s": 3.354431300002034,
+     "memory": {
+      "peak_private_gb": 2.827968512,
+      "peak_working_set_gb": 2.529480704,
+      "samples": 216
+     },
+     "score": "correct",
+     "answer_field": "936",
+     "reason": "last number 936 equals 936",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 10.648050700008753,
+     "time_to_first_token_s": 7.3188307999953395,
+     "decode_tokens_per_s": 1.804492554890444,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      24,
+      18,
+      21
+     ],
+     "text": "Answer: 936",
+     "private_after_gb": 2.61476352,
+     "expert_stats": {
+      "cache_hits": 4,
+      "demand_reads": 368,
+      "prefetch_hits": 1284,
+      "expert_read_seconds": 2.696504400126287
+     },
+     "prefill_forward_s": 7.3188307999953395,
+     "decode_forward_s": 2.768252499998198,
+     "decode_wall_s": 3.3292199000134133,
+     "memory": {
+      "peak_private_gb": 2.823933952,
+      "peak_working_set_gb": 2.491404288,
+      "samples": 196
+     },
+     "score": "correct",
+     "answer_field": "936",
+     "reason": "last number 936 equals 936",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.548969472,
+    "peak_working_set_gb": 1.676087296,
+    "samples": 106
+   },
+   "error": null,
+   "order": 1
+  },
+  {
+   "task_id": "arith_add",
+   "category": "arithmetic",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 3.904643072,
+    "commit_available_gb": 12.092198912,
+    "commit_limit_gb": 20.463304704
+   },
+   "child_wall_s": 78.09652310000092,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.48992256,
+   "child_peak_working_set_gb": 5.283139584,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130617344,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 2.7176275000092573,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216055808,
+   "prompt_tokens": 51,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 31.767680599994492,
+     "time_to_first_token_s": 25.302800500008743,
+     "decode_tokens_per_s": 0.9334528692308196,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      24,
+      18,
+      21
+     ],
+     "text": "Answer: 936",
+     "private_after_gb": 0.274108416,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 25.302800500008743,
+     "decode_forward_s": 5.708296100012376,
+     "decode_wall_s": 6.4648800999857485,
+     "memory": {
+      "peak_private_gb": 0.48799744,
+      "peak_working_set_gb": 5.17699584,
+      "samples": 580
+     },
+     "score": "correct",
+     "answer_field": "936",
+     "reason": "last number 936 equals 936",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 39.895766499990714,
+     "time_to_first_token_s": 32.65095850000216,
+     "decode_tokens_per_s": 0.830743686039761,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      24,
+      18,
+      21
+     ],
+     "text": "Answer: 936",
+     "private_after_gb": 0.274059264,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 32.65095850000216,
+     "decode_forward_s": 6.106933299990487,
+     "decode_wall_s": 7.244807999988552,
+     "memory": {
+      "peak_private_gb": 0.48347136,
+      "peak_working_set_gb": 5.272756224,
+      "samples": 736
+     },
+     "score": "correct",
+     "answer_field": "936",
+     "reason": "last number 936 equals 936",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.216055808,
+    "peak_working_set_gb": 0.131432448,
+    "samples": 50
+   },
+   "error": null,
+   "order": 2
+  },
+  {
+   "task_id": "arith_mul",
+   "category": "arithmetic",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 5.377196032,
+    "commit_available_gb": 12.111253504,
+    "commit_limit_gb": 20.463304704
+   },
+   "child_wall_s": 92.19413180000265,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.489844736,
+   "child_peak_working_set_gb": 5.35238656,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.13060096,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 3.4185683999967296,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.215445504,
+   "prompt_tokens": 50,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 39.35760940000182,
+     "time_to_first_token_s": 28.061375000004773,
+     "decode_tokens_per_s": 0.801970123369737,
+     "tokens_generated": 9,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      22,
+      11,
+      15,
+      20,
+      17
+     ],
+     "text": "Answer: 17,052",
+     "private_after_gb": 0.274194432,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 28.061375000004773,
+     "decode_forward_s": 9.873953799993615,
+     "decode_wall_s": 11.296234399997047,
+     "memory": {
+      "peak_private_gb": 0.48791552,
+      "peak_working_set_gb": 5.3153792,
+      "samples": 701
+     },
+     "score": "incorrect",
+     "answer_field": "17,052",
+     "reason": "numbers ['17052'] do not give 17532",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 45.308602999997674,
+     "time_to_first_token_s": 36.37158690000069,
+     "decode_tokens_per_s": 1.009328947089538,
+     "tokens_generated": 9,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      22,
+      11,
+      15,
+      20,
+      17
+     ],
+     "text": "Answer: 17,052",
+     "private_after_gb": 0.27414528,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 36.37158690000069,
+     "decode_forward_s": 8.142343499988783,
+     "decode_wall_s": 8.937016099996981,
+     "memory": {
+      "peak_private_gb": 0.483659776,
+      "peak_working_set_gb": 5.35457792,
+      "samples": 822
+     },
+     "score": "incorrect",
+     "answer_field": "17,052",
+     "reason": "numbers ['17052'] do not give 17532",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.215445504,
+    "peak_working_set_gb": 0.112320512,
+    "samples": 63
+   },
+   "error": null,
+   "order": 3
+  },
+  {
+   "task_id": "arith_mul",
+   "category": "arithmetic",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.890865664,
+    "commit_available_gb": 12.148523008,
+    "commit_limit_gb": 20.463304704
+   },
+   "child_wall_s": 37.06204279999656,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.83011072,
+   "child_peak_working_set_gb": 2.55338496,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130736128,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 5.732938000001013,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.554478592,
+   "prompt_tokens": 50,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 14.732517800002825,
+     "time_to_first_token_s": 8.949571800010744,
+     "decode_tokens_per_s": 1.557510854685145,
+     "tokens_generated": 9,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      22,
+      11,
+      15,
+      20,
+      17
+     ],
+     "text": "Answer: 17,052",
+     "private_after_gb": 2.614915072,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 513,
+      "prefetch_hits": 1377,
+      "expert_read_seconds": 4.800583300064318
+     },
+     "prefill_forward_s": 8.949571800010744,
+     "decode_forward_s": 5.117561099992599,
+     "decode_wall_s": 5.78294599999208,
+     "memory": {
+      "peak_private_gb": 2.82810368,
+      "peak_working_set_gb": 2.543300608,
+      "samples": 269
+     },
+     "score": "incorrect",
+     "answer_field": "17,052",
+     "reason": "numbers ['17052'] do not give 17532",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 13.501108500000555,
+     "time_to_first_token_s": 7.955574000006891,
+     "decode_tokens_per_s": 1.6241422318415482,
+     "tokens_generated": 9,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      22,
+      11,
+      15,
+      20,
+      17
+     ],
+     "text": "Answer: 17,052",
+     "private_after_gb": 2.6149888,
+     "expert_stats": {
+      "cache_hits": 1,
+      "demand_reads": 564,
+      "prefetch_hits": 1352,
+      "expert_read_seconds": 4.615627699735342
+     },
+     "prefill_forward_s": 7.955574000006891,
+     "decode_forward_s": 4.841735299996799,
+     "decode_wall_s": 5.545534499993664,
+     "memory": {
+      "peak_private_gb": 2.823647232,
+      "peak_working_set_gb": 2.543415296,
+      "samples": 250
+     },
+     "score": "incorrect",
+     "answer_field": "17,052",
+     "reason": "numbers ['17052'] do not give 17532",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.55025152,
+    "peak_working_set_gb": 1.676869632,
+    "samples": 105
+   },
+   "error": null,
+   "order": 4
+  },
+  {
+   "task_id": "arith_multi",
+   "category": "arithmetic",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.669046784,
+    "commit_available_gb": 12.140797952,
+    "commit_limit_gb": 20.463304704
+   },
+   "child_wall_s": 30.05374319999828,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.831028224,
+   "child_peak_working_set_gb": 2.541072384,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130736128,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 3.218442600002163,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.554376192,
+   "prompt_tokens": 53,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 12.99201549999998,
+     "time_to_first_token_s": 8.664633199994569,
+     "decode_tokens_per_s": 1.619702018333284,
+     "tokens_generated": 7,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      16,
+      15,
+      16
+     ],
+     "text": "Answer: 1101",
+     "private_after_gb": 2.615103488,
+     "expert_stats": {
+      "cache_hits": 6,
+      "demand_reads": 365,
+      "prefetch_hits": 1414,
+      "expert_read_seconds": 3.356952499860199
+     },
+     "prefill_forward_s": 8.664633199994569,
+     "decode_forward_s": 3.8015798999840626,
+     "decode_wall_s": 4.327382300005411,
+     "memory": {
+      "peak_private_gb": 2.8291072,
+      "peak_working_set_gb": 2.529722368,
+      "samples": 239
+     },
+     "score": "incorrect",
+     "answer_field": "1101",
+     "reason": "numbers ['1101'] do not give 692",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 11.728029700010666,
+     "time_to_first_token_s": 7.991702900006203,
+     "decode_tokens_per_s": 1.8756086182425558,
+     "tokens_generated": 7,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      16,
+      15,
+      16
+     ],
+     "text": "Answer: 1101",
+     "private_after_gb": 2.615148544,
+     "expert_stats": {
+      "cache_hits": 7,
+      "demand_reads": 421,
+      "prefetch_hits": 1367,
+      "expert_read_seconds": 2.956188599942834
+     },
+     "prefill_forward_s": 7.991702900006203,
+     "decode_forward_s": 3.2259769000083907,
+     "decode_wall_s": 3.7363268000044627,
+     "memory": {
+      "peak_private_gb": 2.824192,
+      "peak_working_set_gb": 2.472153088,
+      "samples": 216
+     },
+     "score": "incorrect",
+     "answer_field": "1101",
+     "reason": "numbers ['1101'] do not give 692",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.55449088,
+    "peak_working_set_gb": 1.681526784,
+    "samples": 60
+   },
+   "error": null,
+   "order": 5
+  },
+  {
+   "task_id": "arith_multi",
+   "category": "arithmetic",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 4.809711616,
+    "commit_available_gb": 12.122832896,
+    "commit_limit_gb": 20.463304704
+   },
+   "child_wall_s": 78.10341690000496,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.489992192,
+   "child_peak_working_set_gb": 4.955807744,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.13078528,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 2.4244021000049543,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216326144,
+   "prompt_tokens": 53,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 32.176543699999456,
+     "time_to_first_token_s": 24.995404299988877,
+     "decode_tokens_per_s": 0.9772685519869856,
+     "tokens_generated": 7,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      16,
+      15,
+      16
+     ],
+     "text": "Answer: 1101",
+     "private_after_gb": 0.274096128,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 24.995404299988877,
+     "decode_forward_s": 6.643906000012066,
+     "decode_wall_s": 7.181139400010579,
+     "memory": {
+      "peak_private_gb": 0.488574976,
+      "peak_working_set_gb": 4.693581824,
+      "samples": 583
+     },
+     "score": "incorrect",
+     "answer_field": "1101",
+     "reason": "numbers ['1101'] do not give 692",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 40.8028772000107,
+     "time_to_first_token_s": 33.77635640000517,
+     "decode_tokens_per_s": 0.9987629179841188,
+     "tokens_generated": 7,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      16,
+      15,
+      16
+     ],
+     "text": "Answer: 1101",
+     "private_after_gb": 0.272449536,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 33.77635640000517,
+     "decode_forward_s": 6.50537839999015,
+     "decode_wall_s": 7.026520800005528,
+     "memory": {
+      "peak_private_gb": 0.48447488,
+      "peak_working_set_gb": 4.958339072,
+      "samples": 746
+     },
+     "score": "incorrect",
+     "answer_field": "1101",
+     "reason": "numbers ['1101'] do not give 692",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.2082816,
+    "peak_working_set_gb": 0.132284416,
+    "samples": 44
+   },
+   "error": null,
+   "order": 6
+  },
+  {
+   "task_id": "eq_linear",
+   "category": "equation",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 5.049540608,
+    "commit_available_gb": 12.187549696,
+    "commit_limit_gb": 20.463304704
+   },
+   "child_wall_s": 89.12662809999892,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.490901504,
+   "child_peak_working_set_gb": 5.000286208,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130564096,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 3.6188878000102704,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216072192,
+   "prompt_tokens": 55,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 36.75476680000429,
+     "time_to_first_token_s": 29.304720499989344,
+     "decode_tokens_per_s": 0.8075953154967498,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      21
+     ],
+     "text": "Answer: x = 6",
+     "private_after_gb": 0.274251776,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 29.304720499989344,
+     "decode_forward_s": 6.45257509998919,
+     "decode_wall_s": 7.450046300014947,
+     "memory": {
+      "peak_private_gb": 0.48898048,
+      "peak_working_set_gb": 4.871688192,
+      "samples": 653
+     },
+     "score": "correct",
+     "answer_field": "x = 6",
+     "reason": "last number 6 equals 6",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 44.30843639999512,
+     "time_to_first_token_s": 36.24995240000135,
+     "decode_tokens_per_s": 0.7556780705637248,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      21
+     ],
+     "text": "Answer: x = 6",
+     "private_after_gb": 0.274173952,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 36.24995240000135,
+     "decode_forward_s": 6.376211199982208,
+     "decode_wall_s": 8.058483999993769,
+     "memory": {
+      "peak_private_gb": 0.484548608,
+      "peak_working_set_gb": 4.994408448,
+      "samples": 806
+     },
+     "score": "correct",
+     "answer_field": "x = 6",
+     "reason": "last number 6 equals 6",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.206979072,
+    "peak_working_set_gb": 0.130629632,
+    "samples": 66
+   },
+   "error": null,
+   "order": 7
+  },
+  {
+   "task_id": "eq_linear",
+   "category": "equation",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.864413696,
+    "commit_available_gb": 12.042518528,
+    "commit_limit_gb": 20.463304704
+   },
+   "child_wall_s": 33.07456209999509,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.830557184,
+   "child_peak_working_set_gb": 2.553585664,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130748416,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 5.376819400000386,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.551267328,
+   "prompt_tokens": 55,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 12.668273699993733,
+     "time_to_first_token_s": 9.305045699991751,
+     "decode_tokens_per_s": 1.7912939531324346,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      21
+     ],
+     "text": "Answer: x = 6",
+     "private_after_gb": 2.614935552,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 305,
+      "prefetch_hits": 1420,
+      "expert_read_seconds": 2.6046966000430984
+     },
+     "prefill_forward_s": 9.305045699991751,
+     "decode_forward_s": 2.7798083999950904,
+     "decode_wall_s": 3.363228000001982,
+     "memory": {
+      "peak_private_gb": 2.82863616,
+      "peak_working_set_gb": 2.544128,
+      "samples": 233
+     },
+     "score": "correct",
+     "answer_field": "x = 6",
+     "reason": "last number 6 equals 6",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 11.418434699997306,
+     "time_to_first_token_s": 8.114365100002033,
+     "decode_tokens_per_s": 1.8181670524597215,
+     "tokens_generated": 6,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      21
+     ],
+     "text": "Answer: x = 6",
+     "private_after_gb": 2.614943744,
+     "expert_stats": {
+      "cache_hits": 1,
+      "demand_reads": 349,
+      "prefetch_hits": 1409,
+      "expert_read_seconds": 2.489603000052739
+     },
+     "prefill_forward_s": 8.114365100002033,
+     "decode_forward_s": 2.748708800005261,
+     "decode_wall_s": 3.304069599995273,
+     "memory": {
+      "peak_private_gb": 2.824196096,
+      "peak_working_set_gb": 2.544033792,
+      "samples": 210
+     },
+     "score": "correct",
+     "answer_field": "x = 6",
+     "reason": "last number 6 equals 6",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 1.75398912,
+    "peak_working_set_gb": 1.67174144,
+    "samples": 99
+   },
+   "error": null,
+   "order": 8
+  },
+  {
+   "task_id": "eq_quadratic",
+   "category": "equation",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.736905216,
+    "commit_available_gb": 12.208979968,
+    "commit_limit_gb": 20.463304704
+   },
+   "child_wall_s": 35.04473960000905,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.831003648,
+   "child_peak_working_set_gb": 2.558251008,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130756608,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 3.1659642000013264,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.55567872,
+   "prompt_tokens": 57,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 15.08556839999801,
+     "time_to_first_token_s": 9.014139400009299,
+     "decode_tokens_per_s": 1.8129099360314427,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      17,
+      11,
+      856,
+      284,
+      220,
+      18
+     ],
+     "text": "Answer: x = 2, x = 3",
+     "private_after_gb": 2.61511168,
+     "expert_stats": {
+      "cache_hits": 5,
+      "demand_reads": 667,
+      "prefetch_hits": 1567,
+      "expert_read_seconds": 4.545007099804934
+     },
+     "prefill_forward_s": 9.014139400009299,
+     "decode_forward_s": 5.528200399960042,
+     "decode_wall_s": 6.071428999988711,
+     "memory": {
+      "peak_private_gb": 2.8291072,
+      "peak_working_set_gb": 2.547458048,
+      "samples": 278
+     },
+     "score": "correct",
+     "answer_field": "x = 2, x = 3",
+     "reason": "solutions [2.0, 3.0] match",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 14.697037600009935,
+     "time_to_first_token_s": 8.501323599994066,
+     "decode_tokens_per_s": 1.7766308566834208,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      17,
+      11,
+      856,
+      284,
+      220,
+      18
+     ],
+     "text": "Answer: x = 2, x = 3",
+     "private_after_gb": 2.615115776,
+     "expert_stats": {
+      "cache_hits": 5,
+      "demand_reads": 722,
+      "prefetch_hits": 1533,
+      "expert_read_seconds": 4.63289199990686
+     },
+     "prefill_forward_s": 8.501323599994066,
+     "decode_forward_s": 5.644011999975191,
+     "decode_wall_s": 6.195714000015869,
+     "memory": {
+      "peak_private_gb": 2.824019968,
+      "peak_working_set_gb": 2.547224576,
+      "samples": 271
+     },
+     "score": "correct",
+     "answer_field": "x = 2, x = 3",
+     "reason": "solutions [2.0, 3.0] match",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.551771136,
+    "peak_working_set_gb": 1.678303232,
+    "samples": 58
+   },
+   "error": null,
+   "order": 9
+  },
+  {
+   "task_id": "eq_quadratic",
+   "category": "equation",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 4.6009344,
+    "commit_available_gb": 12.160299008,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 89.07881999999518,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.489742336,
+   "child_peak_working_set_gb": 4.9613824,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130756608,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 2.41585259999556,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216358912,
+   "prompt_tokens": 57,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 37.387562599993544,
+     "time_to_first_token_s": 26.347154600007343,
+     "decode_tokens_per_s": 0.998124560243922,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      17,
+      11,
+      856,
+      284,
+      220,
+      18
+     ],
+     "text": "Answer: x = 2, x = 3",
+     "private_after_gb": 0.274231296,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 26.347154600007343,
+     "decode_forward_s": 9.88091990002431,
+     "decode_wall_s": 11.0404079999862,
+     "memory": {
+      "peak_private_gb": 0.487817216,
+      "peak_working_set_gb": 4.959227904,
+      "samples": 689
+     },
+     "score": "correct",
+     "answer_field": "x = 2, x = 3",
+     "reason": "solutions [2.0, 3.0] match",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 46.7052493999945,
+     "time_to_first_token_s": 34.87123749998864,
+     "decode_tokens_per_s": 0.931031284565732,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      17,
+      11,
+      856,
+      284,
+      220,
+      18
+     ],
+     "text": "Answer: x = 2, x = 3",
+     "private_after_gb": 0.27404288,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 34.87123749998864,
+     "decode_forward_s": 10.849617999978364,
+     "decode_wall_s": 11.834011900005862,
+     "memory": {
+      "peak_private_gb": 0.483647488,
+      "peak_working_set_gb": 4.91106304,
+      "samples": 858
+     },
+     "score": "correct",
+     "answer_field": "x = 2, x = 3",
+     "reason": "solutions [2.0, 3.0] match",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.208027648,
+    "peak_working_set_gb": 0.131715072,
+    "samples": 44
+   },
+   "error": null,
+   "order": 10
+  },
+  {
+   "task_id": "eq_hard",
+   "category": "equation",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 5.03758848,
+    "commit_available_gb": 12.191490048,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 110.32263870000315,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.486055936,
+   "child_peak_working_set_gb": 5.088034816,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130625536,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 3.5391976999962935,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.215998464,
+   "prompt_tokens": 60,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 45.433881799996016,
+     "time_to_first_token_s": 31.842000300006475,
+     "decode_tokens_per_s": 0.8222893765181509,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      19,
+      323,
+      856,
+      284,
+      481,
+      20
+     ],
+     "text": "Answer: x = 4 and x = -5",
+     "private_after_gb": 0.273068032,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 31.842000300006475,
+     "decode_forward_s": 12.384721500013256,
+     "decode_wall_s": 13.59188149998954,
+     "memory": {
+      "peak_private_gb": 0.486797312,
+      "peak_working_set_gb": 4.982771712,
+      "samples": 831
+     },
+     "score": "incorrect",
+     "answer_field": "x = 4 and x = -5",
+     "reason": "x values ['4', '-5'], numbers ['4', '-5']",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 56.43181700000423,
+     "time_to_first_token_s": 43.58029329999408,
+     "decode_tokens_per_s": 0.8570763213056309,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      19,
+      323,
+      856,
+      284,
+      481,
+      20
+     ],
+     "text": "Answer: x = 4 and x = -5",
+     "private_after_gb": 0.27392,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 43.58029329999408,
+     "decode_forward_s": 11.814709100013715,
+     "decode_wall_s": 12.851523700010148,
+     "memory": {
+      "peak_private_gb": 0.483917824,
+      "peak_working_set_gb": 5.091319808,
+      "samples": 1033
+     },
+     "score": "incorrect",
+     "answer_field": "x = 4 and x = -5",
+     "reason": "x values ['4', '-5'], numbers ['4', '-5']",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.215998464,
+    "peak_working_set_gb": 0.130891776,
+    "samples": 65
+   },
+   "error": null,
+   "order": 11
+  },
+  {
+   "task_id": "eq_hard",
+   "category": "equation",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 5.036961792,
+    "commit_available_gb": 12.14584832,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 44.09523269999772,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.830614528,
+   "child_peak_working_set_gb": 2.558263296,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130715648,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 6.029613000006066,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.55430656,
+   "prompt_tokens": 60,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 17.735746199992718,
+     "time_to_first_token_s": 10.553171700012172,
+     "decode_tokens_per_s": 1.56896052926894,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      19,
+      323,
+      856,
+      284,
+      481,
+      20
+     ],
+     "text": "Answer: x = 4 and x = -5",
+     "private_after_gb": 2.614685696,
+     "expert_stats": {
+      "cache_hits": 3,
+      "demand_reads": 688,
+      "prefetch_hits": 1547,
+      "expert_read_seconds": 6.3924010000773706
+     },
+     "prefill_forward_s": 10.553171700012172,
+     "decode_forward_s": 6.46882830002869,
+     "decode_wall_s": 7.1825744999805465,
+     "memory": {
+      "peak_private_gb": 2.828693504,
+      "peak_working_set_gb": 2.54687232,
+      "samples": 325
+     },
+     "score": "incorrect",
+     "answer_field": "x = 4 and x = -5",
+     "reason": "x values ['4', '-5'], numbers ['4', '-5']",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 16.363443900001585,
+     "time_to_first_token_s": 9.364875700004632,
+     "decode_tokens_per_s": 1.572653691118508,
+     "tokens_generated": 11,
+     "token_ids": [
+      16141,
+      25,
+      856,
+      284,
+      220,
+      19,
+      323,
+      856,
+      284,
+      481,
+      20
+     ],
+     "text": "Answer: x = 4 and x = -5",
+     "private_after_gb": 2.614767616,
+     "expert_stats": {
+      "cache_hits": 3,
+      "demand_reads": 727,
+      "prefetch_hits": 1537,
+      "expert_read_seconds": 6.257024600243312
+     },
+     "prefill_forward_s": 9.364875700004632,
+     "decode_forward_s": 6.453777300004731,
+     "decode_wall_s": 6.998568199996953,
+     "memory": {
+      "peak_private_gb": 2.824773632,
+      "peak_working_set_gb": 2.547535872,
+      "samples": 302
+     },
+     "score": "incorrect",
+     "answer_field": "x = 4 and x = -5",
+     "reason": "x values ['4', '-5'], numbers ['4', '-5']",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.5468928,
+    "peak_working_set_gb": 1.673076736,
+    "samples": 110
+   },
+   "error": null,
+   "order": 12
+  },
+  {
+   "task_id": "fact_capital",
+   "category": "factual",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.71328768,
+    "commit_available_gb": 12.16159744,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 41.03989329999604,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.829688832,
+   "child_peak_working_set_gb": 2.550812672,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130822144,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 3.181012400003965,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.5552896,
+   "prompt_tokens": 47,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 17.822288900002604,
+     "time_to_first_token_s": 7.8811683999956585,
+     "decode_tokens_per_s": 1.5095388210993474,
+     "tokens_generated": 15,
+     "token_ids": [
+      16141,
+      25,
+      68790,
+      13,
+      13023,
+      1555,
+      25,
+      4695,
+      498,
+      1414,
+      279,
+      6722,
+      315,
+      8330,
+      0
+     ],
+     "text": "Answer: Canberra. Final line: Now you know the capital of Australia!",
+     "private_after_gb": 2.614980608,
+     "expert_stats": {
+      "cache_hits": 11,
+      "demand_reads": 929,
+      "prefetch_hits": 1507,
+      "expert_read_seconds": 8.47229559996049
+     },
+     "prefill_forward_s": 7.8811683999956585,
+     "decode_forward_s": 9.396019499981776,
+     "decode_wall_s": 9.941120500006946,
+     "memory": {
+      "peak_private_gb": 2.827792384,
+      "peak_working_set_gb": 2.539905024,
+      "samples": 328
+     },
+     "score": "correct",
+     "answer_field": "Canberra. Final line: Now you know the capital of Australia!",
+     "reason": "names Canberra",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 17.788211899998714,
+     "time_to_first_token_s": 8.07668859999103,
+     "decode_tokens_per_s": 1.5452484917142395,
+     "tokens_generated": 15,
+     "token_ids": [
+      16141,
+      25,
+      68790,
+      13,
+      13023,
+      1555,
+      25,
+      4695,
+      498,
+      1414,
+      279,
+      6722,
+      315,
+      8330,
+      0
+     ],
+     "text": "Answer: Canberra. Final line: Now you know the capital of Australia!",
+     "private_after_gb": 2.615013376,
+     "expert_stats": {
+      "cache_hits": 8,
+      "demand_reads": 989,
+      "prefetch_hits": 1451,
+      "expert_read_seconds": 8.759379299823195
+     },
+     "prefill_forward_s": 8.07668859999103,
+     "decode_forward_s": 8.973525700028404,
+     "decode_wall_s": 9.711523300007684,
+     "memory": {
+      "peak_private_gb": 2.823200768,
+      "peak_working_set_gb": 2.532614144,
+      "samples": 327
+     },
+     "score": "correct",
+     "answer_field": "Canberra. Final line: Now you know the capital of Australia!",
+     "reason": "names Canberra",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.549972992,
+    "peak_working_set_gb": 1.676484608,
+    "samples": 58
+   },
+   "error": null,
+   "order": 13
+  },
+  {
+   "task_id": "fact_capital",
+   "category": "factual",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 4.628099072,
+    "commit_available_gb": 12.211621888,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 98.12721269999747,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.48943104,
+   "child_peak_working_set_gb": 5.06052608,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130605056,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 2.4428046999964863,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216424448,
+   "prompt_tokens": 47,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 44.64011269999901,
+     "time_to_first_token_s": 26.900911800010363,
+     "decode_tokens_per_s": 0.846712391053209,
+     "tokens_generated": 15,
+     "token_ids": [
+      16141,
+      25,
+      68790,
+      13,
+      13023,
+      1555,
+      25,
+      4695,
+      498,
+      1414,
+      279,
+      6722,
+      315,
+      8330,
+      0
+     ],
+     "text": "Answer: Canberra. Final line: Now you know the capital of Australia!",
+     "private_after_gb": 0.274313216,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 26.900911800010363,
+     "decode_forward_s": 16.386392800035537,
+     "decode_wall_s": 17.739200899988646,
+     "memory": {
+      "peak_private_gb": 0.487518208,
+      "peak_working_set_gb": 4.845641728,
+      "samples": 814
+     },
+     "score": "correct",
+     "answer_field": "Canberra. Final line: Now you know the capital of Australia!",
+     "reason": "names Canberra",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 48.45836110001255,
+     "time_to_first_token_s": 32.639434900003835,
+     "decode_tokens_per_s": 0.9492556772310671,
+     "tokens_generated": 15,
+     "token_ids": [
+      16141,
+      25,
+      68790,
+      13,
+      13023,
+      1555,
+      25,
+      4695,
+      498,
+      1414,
+      279,
+      6722,
+      315,
+      8330,
+      0
+     ],
+     "text": "Answer: Canberra. Final line: Now you know the capital of Australia!",
+     "private_after_gb": 0.274259968,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 32.639434900003835,
+     "decode_forward_s": 14.639957500025048,
+     "decode_wall_s": 15.818926200008718,
+     "memory": {
+      "peak_private_gb": 0.483106816,
+      "peak_working_set_gb": 5.056897024,
+      "samples": 889
+     },
+     "score": "correct",
+     "answer_field": "Canberra. Final line: Now you know the capital of Australia!",
+     "reason": "names Canberra",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.207990784,
+    "peak_working_set_gb": 0.131657728,
+    "samples": 44
+   },
+   "error": null,
+   "order": 14
+  },
+  {
+   "task_id": "fact_symbol",
+   "category": "factual",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 5.122957312,
+    "commit_available_gb": 12.16520192,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 73.12301570001,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.489459712,
+   "child_peak_working_set_gb": 5.04133632,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.13058048,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 4.054788299996289,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.215851008,
+   "prompt_tokens": 47,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 29.13897120000911,
+     "time_to_first_token_s": 26.90572580001026,
+     "decode_tokens_per_s": 0.45117472815359233,
+     "tokens_generated": 1,
+     "token_ids": [
+      16193
+     ],
+     "text": "Na",
+     "private_after_gb": 0.274173952,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 26.90572580001026,
+     "decode_forward_s": 0,
+     "decode_wall_s": 2.23324539999885,
+     "memory": {
+      "peak_private_gb": 0.487550976,
+      "peak_working_set_gb": 5.030940672,
+      "samples": 535
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 34.968138100011856,
+     "time_to_first_token_s": 32.595080200000666,
+     "decode_tokens_per_s": 0.42379627977099005,
+     "tokens_generated": 1,
+     "token_ids": [
+      16193
+     ],
+     "text": "Na",
+     "private_after_gb": 0.27408384,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 32.595080200000666,
+     "decode_forward_s": 0,
+     "decode_wall_s": 2.37305790001119,
+     "memory": {
+      "peak_private_gb": 0.48314368,
+      "peak_working_set_gb": 5.002067968,
+      "samples": 643
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.20719616,
+    "peak_working_set_gb": 0.130781184,
+    "samples": 74
+   },
+   "error": null,
+   "order": 15
+  },
+  {
+   "task_id": "fact_symbol",
+   "category": "factual",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.942393344,
+    "commit_available_gb": 12.18473984,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 25.056979800006957,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.829402112,
+   "child_peak_working_set_gb": 2.550157312,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.13053952,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 4.944110600001295,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.549653504,
+   "prompt_tokens": 47,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 8.981841100001475,
+     "time_to_first_token_s": 8.400128799999948,
+     "decode_tokens_per_s": 1.8307815899756388,
+     "tokens_generated": 1,
+     "token_ids": [
+      16193
+     ],
+     "text": "Na",
+     "private_after_gb": 2.6148864,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 1141,
+      "expert_read_seconds": 1.120029300072929
+     },
+     "prefill_forward_s": 8.400128799999948,
+     "decode_forward_s": 0,
+     "decode_wall_s": 0.5817123000015272,
+     "memory": {
+      "peak_private_gb": 2.82750976,
+      "peak_working_set_gb": 2.539413504,
+      "samples": 166
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 8.16553759999806,
+     "time_to_first_token_s": 7.586575799999991,
+     "decode_tokens_per_s": 1.7364155867514688,
+     "tokens_generated": 1,
+     "token_ids": [
+      16193
+     ],
+     "text": "Na",
+     "private_after_gb": 2.6148864,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 1103,
+      "expert_read_seconds": 1.2330289001110941
+     },
+     "prefill_forward_s": 7.586575799999991,
+     "decode_forward_s": 0,
+     "decode_wall_s": 0.5789617999980692,
+     "memory": {
+      "peak_private_gb": 2.823241728,
+      "peak_working_set_gb": 2.539425792,
+      "samples": 150
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.545262592,
+    "peak_working_set_gb": 1.671675904,
+    "samples": 90
+   },
+   "error": null,
+   "order": 16
+  },
+  {
+   "task_id": "fact_moon",
+   "category": "factual",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.631584768,
+    "commit_available_gb": 12.1928704,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 29.03171409999777,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.829996032,
+   "child_peak_working_set_gb": 2.553335808,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130547712,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 3.1381385999993654,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.547757056,
+   "prompt_tokens": 50,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 12.137484399994719,
+     "time_to_first_token_s": 8.05622189999849,
+     "decode_tokens_per_s": 1.716590303324805,
+     "tokens_generated": 7,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      24,
+      21,
+      24
+     ],
+     "text": "Answer: 1969",
+     "private_after_gb": 2.614857728,
+     "expert_stats": {
+      "cache_hits": 10,
+      "demand_reads": 363,
+      "prefetch_hits": 1350,
+      "expert_read_seconds": 3.5515522000641795
+     },
+     "prefill_forward_s": 8.05622189999849,
+     "decode_forward_s": 3.5498178000125336,
+     "decode_wall_s": 4.081262499996228,
+     "memory": {
+      "peak_private_gb": 2.828079104,
+      "peak_working_set_gb": 2.539757568,
+      "samples": 223
+     },
+     "score": "correct",
+     "answer_field": "1969",
+     "reason": "last number 1969 equals 1969",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 12.027523400000064,
+     "time_to_first_token_s": 7.782801400011522,
+     "decode_tokens_per_s": 1.6504588464232832,
+     "tokens_generated": 7,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      24,
+      21,
+      24
+     ],
+     "text": "Answer: 1969",
+     "private_after_gb": 2.61490688,
+     "expert_stats": {
+      "cache_hits": 4,
+      "demand_reads": 424,
+      "prefetch_hits": 1302,
+      "expert_read_seconds": 3.845953200099757
+     },
+     "prefill_forward_s": 7.782801400011522,
+     "decode_forward_s": 3.5944905999931507,
+     "decode_wall_s": 4.244721999988542,
+     "memory": {
+      "peak_private_gb": 2.823991296,
+      "peak_working_set_gb": 2.542936064,
+      "samples": 221
+     },
+     "score": "correct",
+     "answer_field": "1969",
+     "reason": "last number 1969 equals 1969",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.555445248,
+    "peak_working_set_gb": 1.682116608,
+    "samples": 58
+   },
+   "error": null,
+   "order": 17
+  },
+  {
+   "task_id": "fact_moon",
+   "category": "factual",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 4.627914752,
+    "commit_available_gb": 12.190994432,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 76.07648200000403,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.490283008,
+   "child_peak_working_set_gb": 4.795793408,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.13058048,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 2.350958900002297,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216358912,
+   "prompt_tokens": 50,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 33.340030999999726,
+     "time_to_first_token_s": 26.194352300008177,
+     "decode_tokens_per_s": 0.9822351133274136,
+     "tokens_generated": 7,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      24,
+      21,
+      24
+     ],
+     "text": "Answer: 1969",
+     "private_after_gb": 0.27404288,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 26.194352300008177,
+     "decode_forward_s": 6.374344299983932,
+     "decode_wall_s": 7.145678699991549,
+     "memory": {
+      "peak_private_gb": 0.48836608,
+      "peak_working_set_gb": 4.766097408,
+      "samples": 611
+     },
+     "score": "correct",
+     "answer_field": "1969",
+     "reason": "last number 1969 equals 1969",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 37.20453980000457,
+     "time_to_first_token_s": 30.55775020000874,
+     "decode_tokens_per_s": 1.0556171818188385,
+     "tokens_generated": 7,
+     "token_ids": [
+      16141,
+      25,
+      220,
+      16,
+      24,
+      21,
+      24
+     ],
+     "text": "Answer: 1969",
+     "private_after_gb": 0.273956864,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 30.55775020000874,
+     "decode_forward_s": 5.840714299993124,
+     "decode_wall_s": 6.646789599995827,
+     "memory": {
+      "peak_private_gb": 0.48406528,
+      "peak_working_set_gb": 4.798631936,
+      "samples": 681
+     },
+     "score": "correct",
+     "answer_field": "1969",
+     "reason": "last number 1969 equals 1969",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.208027648,
+    "peak_working_set_gb": 0.131690496,
+    "samples": 43
+   },
+   "error": null,
+   "order": 18
+  },
+  {
+   "task_id": "read_marbles",
+   "category": "reading",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 4.971892736,
+    "commit_available_gb": 12.133556224,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 133.19505730000674,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.492060672,
+   "child_peak_working_set_gb": 5.037494272,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130531328,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 3.3010785000078613,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.215601152,
+   "prompt_tokens": 94,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 55.38389150000876,
+     "time_to_first_token_s": 34.22889340000984,
+     "decode_tokens_per_s": 1.1359765437461622,
+     "tokens_generated": 24,
+     "token_ids": [
+      80586,
+      702,
+      220,
+      18,
+      2518,
+      488,
+      320,
+      20,
+      481,
+      220,
+      17,
+      8,
+      6303,
+      284,
+      220,
+      21,
+      3594,
+      38763,
+      1431,
+      13,
+      21806,
+      25,
+      220,
+      21
+     ],
+     "text": "Ana has 3 red + (5 - 2) blue = 6 marbles now. Answer: 6",
+     "private_after_gb": 0.274235392,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 34.22889340000984,
+     "decode_forward_s": 20.227749700075947,
+     "decode_wall_s": 21.15499809999892,
+     "memory": {
+      "peak_private_gb": 0.48990208,
+      "peak_working_set_gb": 4.85124096,
+      "samples": 1020
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 70.16806570001063,
+     "time_to_first_token_s": 46.57210769999074,
+     "decode_tokens_per_s": 1.0189460882655363,
+     "tokens_generated": 24,
+     "token_ids": [
+      80586,
+      702,
+      220,
+      18,
+      2518,
+      488,
+      320,
+      20,
+      481,
+      220,
+      17,
+      8,
+      6303,
+      284,
+      220,
+      21,
+      3594,
+      38763,
+      1431,
+      13,
+      21806,
+      25,
+      220,
+      21
+     ],
+     "text": "Ana has 3 red + (5 - 2) blue = 6 marbles now. Answer: 6",
+     "private_after_gb": 0.27410432,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 46.57210769999074,
+     "decode_forward_s": 22.633910500037018,
+     "decode_wall_s": 23.59595800001989,
+     "memory": {
+      "peak_private_gb": 0.48617472,
+      "peak_working_set_gb": 5.042085888,
+      "samples": 1266
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.190808064,
+    "peak_working_set_gb": 0.11444224,
+    "samples": 61
+   },
+   "error": null,
+   "order": 19
+  },
+  {
+   "task_id": "read_marbles",
+   "category": "reading",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.841025536,
+    "commit_available_gb": 11.944382464,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 60.10332159999234,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.834890752,
+   "child_peak_working_set_gb": 2.565144576,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130445312,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 4.613444900009199,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.554769408,
+   "prompt_tokens": 94,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 27.58331719999842,
+     "time_to_first_token_s": 14.62166740000248,
+     "decode_tokens_per_s": 1.852921198987397,
+     "tokens_generated": 24,
+     "token_ids": [
+      80586,
+      702,
+      220,
+      18,
+      2518,
+      488,
+      320,
+      20,
+      481,
+      220,
+      17,
+      8,
+      6303,
+      284,
+      220,
+      21,
+      3594,
+      38763,
+      1431,
+      13,
+      21806,
+      25,
+      220,
+      21
+     ],
+     "text": "Ana has 3 red + (5 - 2) blue = 6 marbles now. Answer: 6",
+     "private_after_gb": 2.615001088,
+     "expert_stats": {
+      "cache_hits": 17,
+      "demand_reads": 1631,
+      "prefetch_hits": 1923,
+      "expert_read_seconds": 9.79633650011965
+     },
+     "prefill_forward_s": 14.62166740000248,
+     "decode_forward_s": 12.40345809997234,
+     "decode_wall_s": 12.96164979999594,
+     "memory": {
+      "peak_private_gb": 2.832969728,
+      "peak_working_set_gb": 2.555850752,
+      "samples": 463
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 24.91481550000026,
+     "time_to_first_token_s": 12.162947100005113,
+     "decode_tokens_per_s": 1.8828448436193324,
+     "tokens_generated": 24,
+     "token_ids": [
+      80586,
+      702,
+      220,
+      18,
+      2518,
+      488,
+      320,
+      20,
+      481,
+      220,
+      17,
+      8,
+      6303,
+      284,
+      220,
+      21,
+      3594,
+      38763,
+      1431,
+      13,
+      21806,
+      25,
+      220,
+      21
+     ],
+     "text": "Ana has 3 red + (5 - 2) blue = 6 marbles now. Answer: 6",
+     "private_after_gb": 2.615042048,
+     "expert_stats": {
+      "cache_hits": 19,
+      "demand_reads": 1690,
+      "prefetch_hits": 1885,
+      "expert_read_seconds": 9.811637100123335
+     },
+     "prefill_forward_s": 12.162947100005113,
+     "decode_forward_s": 12.179807700013043,
+     "decode_wall_s": 12.751868399995146,
+     "memory": {
+      "peak_private_gb": 2.828173312,
+      "peak_working_set_gb": 2.473447424,
+      "samples": 417
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.55346688,
+    "peak_working_set_gb": 1.680560128,
+    "samples": 75
+   },
+   "error": null,
+   "order": 20
+  },
+  {
+   "task_id": "read_train",
+   "category": "reading",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 4.570857472,
+    "commit_available_gb": 12.141699072,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 37.052262500001234,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.8353536,
+   "child_peak_working_set_gb": 2.54052352,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130441216,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 3.360797999994247,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.555277312,
+   "prompt_tokens": 103,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 16.939415700006066,
+     "time_to_first_token_s": 14.688128499998129,
+     "decode_tokens_per_s": 1.782346605458247,
+     "tokens_generated": 4,
+     "token_ids": [
+      16141,
+      25,
+      425,
+      13
+     ],
+     "text": "Answer: B.",
+     "private_after_gb": 2.615062528,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 155,
+      "prefetch_hits": 1497,
+      "expert_read_seconds": 1.4597727001091698
+     },
+     "prefill_forward_s": 14.688128499998129,
+     "decode_forward_s": 1.7155424000084167,
+     "decode_wall_s": 2.251287200007937,
+     "memory": {
+      "peak_private_gb": 2.833457152,
+      "peak_working_set_gb": 2.530029568,
+      "samples": 286
+     },
+     "score": "correct",
+     "answer_field": "B.",
+     "reason": "names B",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 14.956967999998596,
+     "time_to_first_token_s": 12.842219600002863,
+     "decode_tokens_per_s": 1.894959370166719,
+     "tokens_generated": 4,
+     "token_ids": [
+      16141,
+      25,
+      425,
+      13
+     ],
+     "text": "Answer: B.",
+     "private_after_gb": 2.615013376,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 217,
+      "prefetch_hits": 1465,
+      "expert_read_seconds": 1.457028100208845
+     },
+     "prefill_forward_s": 12.842219600002863,
+     "decode_forward_s": 1.5826283000060357,
+     "decode_wall_s": 2.114748399995733,
+     "memory": {
+      "peak_private_gb": 2.828455936,
+      "peak_working_set_gb": 2.477551616,
+      "samples": 254
+     },
+     "score": "correct",
+     "answer_field": "B.",
+     "reason": "names B",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 1.754804224,
+    "peak_working_set_gb": 1.67254016,
+    "samples": 54
+   },
+   "error": null,
+   "order": 21
+  },
+  {
+   "task_id": "read_train",
+   "category": "reading",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 4.615856128,
+    "commit_available_gb": 12.16446464,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 92.09526509999705,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.493203456,
+   "child_peak_working_set_gb": 4.75918336,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130605056,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 2.6372176999866497,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216031232,
+   "prompt_tokens": 103,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 38.57512219999626,
+     "time_to_first_token_s": 33.75856680001016,
+     "decode_tokens_per_s": 0.8338447407364851,
+     "tokens_generated": 4,
+     "token_ids": [
+      16141,
+      25,
+      425,
+      13
+     ],
+     "text": "Answer: B.",
+     "private_after_gb": 0.274137088,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 33.75856680001016,
+     "decode_forward_s": 4.107779499987373,
+     "decode_wall_s": 4.8165553999861,
+     "memory": {
+      "peak_private_gb": 0.489054208,
+      "peak_working_set_gb": 4.688932864,
+      "samples": 646
+     },
+     "score": "correct",
+     "answer_field": "B.",
+     "reason": "names B",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 48.614661800005706,
+     "time_to_first_token_s": 43.62941159999173,
+     "decode_tokens_per_s": 0.804900718511746,
+     "tokens_generated": 4,
+     "token_ids": [
+      16141,
+      25,
+      425,
+      13
+     ],
+     "text": "Answer: B.",
+     "private_after_gb": 0.274092032,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 43.62941159999173,
+     "decode_forward_s": 4.299190700010513,
+     "decode_wall_s": 4.985250200013979,
+     "memory": {
+      "peak_private_gb": 0.487424,
+      "peak_working_set_gb": 4.759072768,
+      "samples": 801
+     },
+     "score": "correct",
+     "answer_field": "B.",
+     "reason": "names B",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.207269888,
+    "peak_working_set_gb": 0.130924544,
+    "samples": 43
+   },
+   "error": null,
+   "order": 22
+  },
+  {
+   "task_id": "read_oldest",
+   "category": "reading",
+   "mode": "mmap",
+   "memory_before": {
+    "physical_available_gb": 5.002027008,
+    "commit_available_gb": 12.104327168,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 102.12490270000126,
+   "exit_code": 0,
+   "child_peak_private_gb": 0.492142592,
+   "child_peak_working_set_gb": 5.068169216,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130752512,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 2.8507411000027787,
+   "estimated_ram_gb": 0.643384832,
+   "cache_slots": 0,
+   "cache_gb": 0.0,
+   "prefetch_active": false,
+   "private_after_load_gb": 0.216092672,
+   "prompt_tokens": 81,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 42.624595000001136,
+     "time_to_first_token_s": 30.603185300002224,
+     "decode_tokens_per_s": 0.8337023855899393,
+     "tokens_generated": 10,
+     "token_ids": [
+      43,
+      2210,
+      374,
+      279,
+      23513,
+      13,
+      21806,
+      25,
+      444,
+      2210
+     ],
+     "text": "Lina is the oldest. Answer: Lina",
+     "private_after_gb": 0.274243584,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 30.603185300002224,
+     "decode_forward_s": 10.178842999986955,
+     "decode_wall_s": 12.021409699998912,
+     "memory": {
+      "peak_private_gb": 0.48928768,
+      "peak_working_set_gb": 5.0122752,
+      "samples": 712
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 52.615848500005086,
+     "time_to_first_token_s": 41.48755219999293,
+     "decode_tokens_per_s": 0.8999155258304452,
+     "tokens_generated": 10,
+     "token_ids": [
+      43,
+      2210,
+      374,
+      279,
+      23513,
+      13,
+      21806,
+      25,
+      444,
+      2210
+     ],
+     "text": "Lina is the oldest. Answer: Lina",
+     "private_after_gb": 0.274239488,
+     "expert_stats": {
+      "cache_hits": 0,
+      "demand_reads": 0,
+      "prefetch_hits": 0,
+      "expert_read_seconds": 0.0
+     },
+     "prefill_forward_s": 41.48755219999293,
+     "decode_forward_s": 10.098712799997884,
+     "decode_wall_s": 11.128296300012153,
+     "memory": {
+      "peak_private_gb": 0.484913152,
+      "peak_working_set_gb": 5.070467072,
+      "samples": 866
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 0.207736832,
+    "peak_working_set_gb": 0.131395584,
+    "samples": 46
+   },
+   "error": null,
+   "order": 23
+  },
+  {
+   "task_id": "read_oldest",
+   "category": "reading",
+   "mode": "cached",
+   "memory_before": {
+    "physical_available_gb": 5.004251136,
+    "commit_available_gb": 12.149833728,
+    "commit_limit_gb": 20.424966144
+   },
+   "child_wall_s": 43.10869439999806,
+   "exit_code": 0,
+   "child_peak_private_gb": 2.8356608,
+   "child_peak_working_set_gb": 2.544758784,
+   "openblas_threads": 4,
+   "numba_threads": 12,
+   "kernel": "fused",
+   "backend": "numpy",
+   "import_private_gb": 0.130588672,
+   "store_manifest_sha256": "b34e84d2999483936f6fb4c64a480b2d98f23ce8722082758d55bf3ce4c38cae",
+   "store_model": "Qwen/Qwen1.5-MoE-A2.7B-Chat",
+   "store_revision": "ec052fda178e241c7c443468d2fa1db6618996be",
+   "load_s": 4.913735000009183,
+   "estimated_ram_gb": 2.99251456,
+   "cache_slots": 91,
+   "cache_gb": 0.789082112,
+   "prefetch_active": true,
+   "private_after_load_gb": 2.554400768,
+   "prompt_tokens": 81,
+   "requests": [
+    {
+     "kind": "first_request",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 18.922983500000555,
+     "time_to_first_token_s": 12.973717999993823,
+     "decode_tokens_per_s": 1.6829832170065686,
+     "tokens_generated": 10,
+     "token_ids": [
+      43,
+      2210,
+      374,
+      279,
+      23513,
+      13,
+      21806,
+      25,
+      444,
+      2210
+     ],
+     "text": "Lina is the oldest. Answer: Lina",
+     "private_after_gb": 2.61496832,
+     "expert_stats": {
+      "cache_hits": 3,
+      "demand_reads": 603,
+      "prefetch_hits": 1600,
+      "expert_read_seconds": 4.466076899989275
+     },
+     "prefill_forward_s": 12.973717999993823,
+     "decode_forward_s": 5.30897699999332,
+     "decode_wall_s": 5.949265500006732,
+     "memory": {
+      "peak_private_gb": 2.833747968,
+      "peak_working_set_gb": 2.53403136,
+      "samples": 317
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    },
+    {
+     "kind": "warm_repeat",
+     "stop_reason": "eos",
+     "error": null,
+     "latency_s": 16.287495199998375,
+     "time_to_first_token_s": 10.532442299998365,
+     "decode_tokens_per_s": 1.7388152707420332,
+     "tokens_generated": 10,
+     "token_ids": [
+      43,
+      2210,
+      374,
+      279,
+      23513,
+      13,
+      21806,
+      25,
+      444,
+      2210
+     ],
+     "text": "Lina is the oldest. Answer: Lina",
+     "private_after_gb": 2.614980608,
+     "expert_stats": {
+      "cache_hits": 7,
+      "demand_reads": 656,
+      "prefetch_hits": 1548,
+      "expert_read_seconds": 4.386886199994478
+     },
+     "prefill_forward_s": 10.532442299998365,
+     "decode_forward_s": 5.120241999975406,
+     "decode_wall_s": 5.75505290000001,
+     "memory": {
+      "peak_private_gb": 2.825547776,
+      "peak_working_set_gb": 2.467872768,
+      "samples": 277
+     },
+     "score": "manual_review",
+     "answer_field": null,
+     "reason": "no 'Answer:' line in a reply that ended normally",
+     "within_time_limit": true
+    }
+   ],
+   "load_memory": {
+    "peak_private_gb": 2.55428608,
+    "peak_working_set_gb": 1.681076224,
+    "samples": 81
+   },
+   "error": null,
+   "order": 24
+  }
+ ],
+ "elapsed_s": 1558.8113821000006,
+ "finished_utc": "2026-10-31T02:04:20Z",
+ "summary": {
+  "by_mode": {
+   "cached": {
+    "name": "LeanMoE",
+    "runs": 12,
+    "failed_runs": 0,
+    "skipped_before_inference": 0,
+    "load_s": [
+     5.79,
+     5.73,
+     3.22,
+     5.38,
+     3.17,
+     6.03,
+     3.18,
+     4.94,
+     3.14,
+     4.61,
+     3.36,
+     4.91
+    ],
+    "first_request": {
+     "attempted": 12,
+     "correct": 6,
+     "rule_correct_incomplete": 0,
+     "incorrect": 3,
+     "manual_review_open": 3,
+     "correct_within_time_limit": 6,
+     "completed_eos": 12,
+     "truncated_at_token_limit": 0,
+     "cancelled_at_hard_cap": 0,
+     "total_latency_s": 187.3,
+     "latency_s_per_correct_task": 31.2,
+     "total_latency_plus_load_s": 240.8,
+     "latency_plus_load_s_per_correct_task": 40.1,
+     "mean_latency_s": 15.6,
+     "median_latency_s": 15.1,
+     "mean_time_to_first_token_s": 10.12,
+     "mean_decode_tokens_per_s": 1.71,
+     "tokens_generated": 111,
+     "peak_private_gb_max": 2.834,
+     "peak_working_set_gb_max": 2.556
+    },
+    "warm_repeat": {
+     "attempted": 12,
+     "correct": 6,
+     "rule_correct_incomplete": 0,
+     "incorrect": 3,
+     "manual_review_open": 3,
+     "correct_within_time_limit": 6,
+     "completed_eos": 12,
+     "truncated_at_token_limit": 0,
+     "cancelled_at_hard_cap": 0,
+     "total_latency_s": 172.5,
+     "latency_s_per_correct_task": 28.7,
+     "total_latency_plus_load_s": null,
+     "latency_plus_load_s_per_correct_task": null,
+     "mean_latency_s": 14.4,
+     "median_latency_s": 14.7,
+     "mean_time_to_first_token_s": 9.02,
+     "mean_decode_tokens_per_s": 1.743,
+     "tokens_generated": 111,
+     "peak_private_gb_max": 2.828,
+     "peak_working_set_gb_max": 2.548
+    },
+    "child_wall_s_total": 445.8
+   },
+   "mmap": {
+    "name": "Windows paging",
+    "runs": 12,
+    "failed_runs": 0,
+    "skipped_before_inference": 0,
+    "load_s": [
+     2.72,
+     3.42,
+     2.42,
+     3.62,
+     2.42,
+     3.54,
+     2.44,
+     4.05,
+     2.35,
+     3.3,
+     2.64,
+     2.85
+    ],
+    "first_request": {
+     "attempted": 12,
+     "correct": 6,
+     "rule_correct_incomplete": 0,
+     "incorrect": 3,
+     "manual_review_open": 3,
+     "correct_within_time_limit": 6,
+     "completed_eos": 12,
+     "truncated_at_token_limit": 0,
+     "cancelled_at_hard_cap": 0,
+     "total_latency_s": 466.6,
+     "latency_s_per_correct_task": 77.8,
+     "total_latency_plus_load_s": 502.4,
+     "latency_plus_load_s_per_correct_task": 83.7,
+     "mean_latency_s": 38.9,
+     "median_latency_s": 38.6,
+     "mean_time_to_first_token_s": 28.7,
+     "mean_decode_tokens_per_s": 0.869,
+     "tokens_generated": 111,
+     "peak_private_gb_max": 0.49,
+     "peak_working_set_gb_max": 5.315
+    },
+    "warm_repeat": {
+     "attempted": 12,
+     "correct": 6,
+     "rule_correct_incomplete": 0,
+     "incorrect": 3,
+     "manual_review_open": 3,
+     "correct_within_time_limit": 6,
+     "completed_eos": 12,
+     "truncated_at_token_limit": 0,
+     "cancelled_at_hard_cap": 0,
+     "total_latency_s": 565.5,
+     "latency_s_per_correct_task": 94.2,
+     "total_latency_plus_load_s": null,
+     "latency_plus_load_s_per_correct_task": null,
+     "mean_latency_s": 47.1,
+     "median_latency_s": 46.7,
+     "mean_time_to_first_token_s": 37.08,
+     "mean_decode_tokens_per_s": 0.878,
+     "tokens_generated": 111,
+     "peak_private_gb_max": 0.487,
+     "peak_working_set_gb_max": 5.355
+    },
+    "child_wall_s_total": 1111.7
+   }
+  },
+  "consistency": {
+   "arith_add": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "arith_mul": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "arith_multi": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "eq_linear": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "eq_quadratic": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "eq_hard": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "fact_capital": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "fact_symbol": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "fact_moon": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "read_marbles": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "read_train": {
+    "first_request": true,
+    "warm_repeat": true
+   },
+   "read_oldest": {
+    "first_request": true,
+    "warm_repeat": true
+   }
+  }
+ }
+}
