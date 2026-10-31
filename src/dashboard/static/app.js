@@ -6,8 +6,10 @@
   "use strict";
   const $ = (id) => document.getElementById(id);
   const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(Number(v))) ? "—" : Number(v).toFixed(d);
-  const pick = { source: "real", mode: "cached", "cmp-source": "real" };
-  const ui = { status: null, run: null, cmp: null, qwenMissing: false, busy: false };
+  const pick = { source: "real", mode: "cached", "cmp-source": "real", location: "local" };
+  const ui = { status: null, run: null, cmp: null, qwenMissing: true, busy: false, connected: false, hostLocation: null };
+  const api = (path, location = pick.location) => location === "cloud" && ui.hostLocation !== "server" ? "/cloud" + path : path;
+  const locationName = (location = pick.location) => location === "cloud" ? "cloud server" : "this computer";
 
   // ------------------------------------------------------------ small helpers
 
@@ -45,8 +47,8 @@
     }
   }
 
-  async function postJSON(url, body) {
-    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  async function postJSON(url, body, location) {
+    const r = await fetch(api(url, location), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     let j = {};
     try { j = await r.json(); } catch (e) { /* empty */ }
     return { ok: r.ok, status: r.status, body: j };
@@ -76,10 +78,13 @@
   document.addEventListener("click", (e) => { if (sysDetails.open && !sysDetails.contains(e.target)) sysDetails.open = false; });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") sysDetails.open = false; });
 
-  const tabs = ["run", "compare", "evidence", "cloud"];
+  const tabs = ["run", "compare", "evidence"];
   function showTab(name) {
+    ui.tab = name;
     sysDetails.open = false;
-    $("settings").hidden = name === "cloud";
+    $("execution-bar").hidden = name === "evidence";
+    $("settings").hidden = name === "evidence";
+    $("engine-availability").hidden = name === "evidence" || !ui.status?.access?.protected;
     for (const t of tabs) {
       const on = t === name;
       $("tab-" + t).setAttribute("aria-selected", String(on));
@@ -103,6 +108,13 @@
       const g = b.dataset.group;
       document.querySelectorAll(`.segmented button[data-group="${g}"]`).forEach((o) => o.setAttribute("aria-checked", String(o === b)));
       pick[g] = b.dataset.value;
+      if (g === "location") {
+        ui.status = null; ui.connected = false; ui.qwenMissing = true; ui.otherVisitorBusy = false;
+        $("execution-help").textContent = pick.location === "cloud" ?
+          "Connecting to the protected cloud server. Your browser may ask for private credentials; no separate login page is needed." :
+          "Local runs on this computer. Cloud requires private credentials and runs on the protected server.";
+        updateSelection(); loadStatus(); return;
+      }
       updateSelection();
     });
   });
@@ -126,7 +138,7 @@
     const syn = pick.source === "synthetic";
     b.textContent = syn ? "Engine test: meaningless output" : "Qwen";
     b.className = "badge" + (syn ? " synthetic" : "");
-    $("run-selection").textContent = `Model: ${SOURCE_SHORT[pick.source]} · Method: ${MODE_SHORT[pick.mode]}`;
+    $("run-selection").textContent = `Model: ${SOURCE_SHORT[pick.source]} · Method: ${MODE_SHORT[pick.mode]} · ${locationName()}`;
     document.querySelectorAll(".explain-item").forEach((it) => {
       const on = pick[it.dataset.group] === it.dataset.value;
       it.classList.toggle("selected", on);
@@ -138,8 +150,9 @@
   function refreshButtons() {
     const runBlocked = ui.qwenMissing && pick.source === "real";
     const cmpBlocked = ui.qwenMissing && pick["cmp-source"] === "real";
-    $("run").disabled = ui.busy || ui.otherVisitorBusy || runBlocked;
-    $("compare").disabled = ui.busy || ui.otherVisitorBusy || cmpBlocked;
+    $("run").disabled = !ui.connected || ui.busy || ui.otherVisitorBusy || runBlocked;
+    $("compare").disabled = !ui.connected || ui.busy || ui.otherVisitorBusy || cmpBlocked;
+    document.querySelectorAll('[data-group="location"]').forEach((b) => { b.disabled = ui.busy || ui.hostLocation === null || (b.dataset.value === "local" && ui.hostLocation === "server"); });
   }
 
   for (const p of ["run", "cmp"]) {
@@ -182,32 +195,57 @@
   async function loadStatus() {
     if (statusPending) return;
     statusPending = true;
+    const requestedLocation = pick.location;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     let s;
     try {
-      const response = await fetch("/api/status", {signal: controller.signal});
-      if (!response.ok) throw new Error("status unavailable");
+      const response = await fetch(api("/api/status", requestedLocation), {signal: controller.signal});
+      if (!response.ok) throw new Error(response.status === 401 ? "Cloud sign-in required; use your private credentials in the browser prompt." :
+        response.status === 502 ? "Cloud server unavailable or not running the protected backend." : "Backend status unavailable.");
       s = await response.json();
       if (!s.system || !s.real_store || !s.limits) throw new Error("invalid status");
+      if (requestedLocation === "cloud" && (s.system.execution_location !== "server" || !s.access?.protected))
+        throw new Error("Cloud backend did not confirm protected server execution.");
       disconnected = false;
     } catch (e) {
       disconnected = true;
-      $("store-pill").textContent = "Server not reachable"; $("store-pill").className = "pill no";
-      renderSystem(); return;
-    } finally { clearTimeout(timeout); statusPending = false; }
+      if (requestedLocation === pick.location) {
+        ui.connected = false; ui.status = null;
+        $("store-pill").textContent = requestedLocation === "cloud" ? "Cloud disconnected" : "Local backend disconnected";
+        $("store-pill").className = "pill no";
+        $("execution-help").textContent = String(e.message || e);
+        renderSystem(); refreshButtons();
+      }
+      return;
+    } finally {
+      clearTimeout(timeout); statusPending = false;
+      if (requestedLocation !== pick.location) queueMicrotask(loadStatus);
+    }
+    if (requestedLocation !== pick.location) return;
+    if (ui.hostLocation === null && requestedLocation === "local") {
+      ui.hostLocation = s.system.execution_location;
+      if (ui.hostLocation === "server") {
+        pick.location = "cloud";
+        document.querySelectorAll('[data-group="location"]').forEach((b) => b.setAttribute("aria-checked", String(b.dataset.value === "cloud")));
+        $("execution-help").textContent = "Running on the protected cloud server. Local execution requires a local installation; see the project README.";
+      }
+    }
+    ui.connected = true;
     ui.status = s;
-    $("cloud-location").textContent = s.system?.execution_location === "server" ?
-      "You are using the cloud server. Prompts run on the server, not on your computer." :
-      "Opening the cloud demo moves execution to the server. It does not run cloud inference on your computer.";
-    $("cloud-version").textContent = s.build?.commit ? `Backend version: ${s.build.commit.slice(0, 12)}` : "Backend version unavailable";
+    if (pick.location === "cloud") $("execution-help").textContent =
+      "Protected cloud server connected. One active job; no queue. Cloud speedup is not established.";
+    else $("execution-help").textContent = "Running on this computer. Cloud requires private credentials and runs on the protected server.";
     const protectedSite = Boolean(s.access?.protected);
     ui.otherVisitorBusy = protectedSite && s.busy && !s.active;
-    $("engine-availability").hidden = !protectedSite;
+    $("engine-availability").hidden = !protectedSite || ui.tab === "evidence";
     $("engine-availability").textContent = ui.otherVisitorBusy ? "Engine busy with another visitor. No queue; retry when it is available." :
       "Protected cloud session. Automatic uses measured machine headroom. Manual/constrained limits: 4 GB budget, 1.3 GB cache. One active job; no queue; 96 tokens per mode, 10 minutes per job. Application budgets do not limit Windows file cache or VM RAM.";
     $("max-new").max = s.limits.max_new_tokens;
-    for (const prefix of ["run", "cmp"]) $(prefix + "-advanced").hidden = protectedSite;
+    for (const prefix of ["run", "cmp"]) {
+      $(prefix + "-advanced").hidden = protectedSite;
+      if (protectedSite) $(prefix + "-engine-test").checked = false;
+    }
     const ok = s.real_store.available;
     $("store-pill").textContent = ok ? "Qwen ready" : "Qwen store not found";
     $("store-pill").className = "pill " + (ok ? "ok" : "no");
@@ -218,12 +256,15 @@
     const m = s.system || {};
     document.querySelector(".tagline").textContent = m.execution_location === "local" ? "Local engine dashboard" :
       m.execution_location === "server" ? "Server engine dashboard" : "Engine dashboard";
-    $("live-location").textContent = m.execution_location === "local" ? "measured on the local backend" :
-      m.execution_location === "server" ? "measured on the server backend" : "backend location unavailable";
+    $("live-location").textContent = m.execution_location === "local" ? "measured on this computer" :
+      m.execution_location === "server" ? "measured on the cloud server" : "backend location unavailable";
+    $("cmp-live-location").textContent = "Live comparison measured on " + locationName() + ".";
     renderSystem();
     // Avoid replacing open methodology panels when system data is refreshed.
-    const recordedKey = JSON.stringify(s.recorded);
-    if (ui.recordedKey !== recordedKey) { renderRecorded(s.recorded); ui.recordedKey = recordedKey; }
+    if (ui.hostLocation !== "local" || requestedLocation === "local") {
+      const recordedKey = JSON.stringify(s.recorded);
+      if (ui.recordedKey !== recordedKey) { renderRecorded(s.recorded); ui.recordedKey = recordedKey; }
+    }
   }
 
   function renderRecorded(items) {
@@ -264,6 +305,7 @@
   }
   sysDetails.addEventListener("toggle", () => { if (sysDetails.open) loadStatus(); });
   setInterval(() => { if (sysDetails.open) loadStatus(); }, 5000);
+  setInterval(() => { if (pick.location === "cloud" && !ui.busy && ui.otherVisitorBusy) loadStatus(); }, 5000);
   setInterval(() => { if (sysDetails.open) renderSystem(); }, 1000);
 
   // ------------------------------------------------------------ Run tab
@@ -275,7 +317,7 @@
 
   async function startRun() {
     setError("run-error", "");
-    const r = { requestId: null, text: "", synthetic: pick.source === "synthetic", decodeTime: 0, decodeTokens: 0, phase: null,
+    const r = { requestId: null, location: pick.location, text: "", synthetic: pick.source === "synthetic", decodeTime: 0, decodeTokens: 0, phase: null,
                 done: null, start: null, budget: [], steps: [] };
     ui.run = r;
     ["m-ttft", "m-decode", "m-mem"].forEach((id) => { $(id).textContent = "—"; });
@@ -289,7 +331,7 @@
     ui.busy = true; refreshButtons();
     let resp;
     try {
-      resp = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" },
+      resp = await fetch(api("/api/generate", r.location), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: $("run-prompt").value, source: pick.source, mode: pick.mode, ...settings() }) });
     } catch (e) { return endRun("Could not reach the server: " + e); }
     if (!resp.ok) {
@@ -318,7 +360,7 @@
       if (ev.live_budget) { $("budget-card").hidden = false; }
       if (ev.cache) $("budget-cache").textContent = `Cache: ${ev.cache.slots} experts (${fmt(ev.cache.gb)} GB)`;
       r.start = ev;
-      $("run-confirm").textContent = `Live engine run · ${SOURCE_SHORT[ev.source]} · ${MODE_SHORT[ev.mode]}` +
+      $("run-confirm").textContent = `Live engine run on ${locationName(r.location)} · ${SOURCE_SHORT[ev.source]} · ${MODE_SHORT[ev.mode]}` +
         (ev.source === "synthetic" ? " · meaningless output" : "");
       $("run-confirm").hidden = false;
       showRunDetails(r);
@@ -424,7 +466,9 @@
     const r = which === "run" ? ui.run : ui.cmp;
     if (!r || !r.requestId) return;
     const stateId = which === "run" ? "run-state" : "cmp-state", errId = which === "run" ? "run-error" : "cmp-error";
-    const res = await postJSON("/api/cancel", { request_id: r.requestId });
+    let res;
+    try { res = await postJSON("/api/cancel", { request_id: r.requestId }, r.location); }
+    catch (e) { setError(errId, "Could not reach the selected backend to cancel."); return; }
     if (!res.ok) { setError(errId, res.body.error || "Cancel failed"); return; }
     r.cancelling = true;
     const waiting = res.body.phase === "loading" || res.body.phase === "prefill";
@@ -435,7 +479,9 @@
   $("apply-budget").addEventListener("click", async () => {
     const r = ui.run;
     if (!r || !r.requestId) return;
-    const res = await postJSON("/api/budget", { request_id: r.requestId, budget_gb: Number($("live-budget").value) });
+    let res;
+    try { res = await postJSON("/api/budget", { request_id: r.requestId, budget_gb: Number($("live-budget").value) }, r.location); }
+    catch (e) { $("budget-msg").textContent = "Could not reach the selected backend."; return; }
     $("budget-msg").textContent = res.ok ? `Requested ${res.body.budget_gb} GB: applies after the current token` : res.body.error;
   });
 
@@ -451,7 +497,7 @@
 
   async function startCompare() {
     setError("cmp-error", "");
-    const c = { requestId: null, synthetic: pick["cmp-source"] === "synthetic", text: {}, decode: {} };
+    const c = { requestId: null, location: pick.location, synthetic: pick["cmp-source"] === "synthetic", text: {}, decode: {} };
     ui.cmp = c;
     for (const run of ["cached", "mmap"]) {
       stepState(run, "Waiting");
@@ -465,7 +511,7 @@
     ui.busy = true; refreshButtons();
     let resp;
     try {
-      resp = await fetch("/api/compare", { method: "POST", headers: { "Content-Type": "application/json" },
+      resp = await fetch(api("/api/compare", c.location), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: $("cmp-prompt").value, source: pick["cmp-source"], mode: "cached", ...settings() }) });
     } catch (e) { return endCompare("Could not reach the server: " + e); }
     if (!resp.ok) {
@@ -490,7 +536,7 @@
     if (ev.type === "accepted") { c.requestId = ev.request_id; setState("cmp-state", "Running both modes, one after the other…", "busy"); return; }
     if (ev.type === "start") {
       c.text[run] = ""; c.decode[run] = { t: 0, n: 0 }; stepState(run, "Loading model…", "active");
-      $("cmp-confirm").textContent = `Live engine run · ${SOURCE_SHORT[ev.source]} · now ${MODE_SHORT[ev.mode]}` +
+      $("cmp-confirm").textContent = `Live engine run on ${locationName(c.location)} · ${SOURCE_SHORT[ev.source]} · now ${MODE_SHORT[ev.mode]}` +
         (ev.source === "synthetic" ? " · meaningless output" : "");
       $("cmp-confirm").hidden = false;
       return;
@@ -523,7 +569,7 @@
       else if (ev.token_ids_identical) { m.className = "match same"; m.textContent = "Same tokens in both modes"; }
       else { m.className = "match diff"; m.textContent = "Different tokens in the two modes"; }
       setState("cmp-state", c.cancelling ? "Cancelled" : "Comparison complete", c.cancelling ? "cancel" : "done");
-      $("cmp-confirm").textContent = `Live engine run · ${SOURCE_SHORT[pick["cmp-source"]]} · ` +
+      $("cmp-confirm").textContent = `Live engine run on ${locationName(c.location)} · ${SOURCE_SHORT[pick["cmp-source"]]} · ` +
         ev.completed_runs.map((m) => MODE_SHORT[m]).join(", then ") + (c.synthetic ? " · meaningless output" : "");
       for (const run of ["cached", "mmap"]) if (!ev.completed_runs.includes(run)) stepState(run, "Not run");
       const rows = [];

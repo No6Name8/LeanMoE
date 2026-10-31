@@ -8,7 +8,7 @@
 
 Windows only · Python 3.13 tested · Qwen1.5-MoE-A2.7B-Chat int8
 
-The live demo runs the **same engine and model store on a Windows cloud server**; your browser needs no model download. It requires credentials supplied by the demo owner. The local dashboard stays on `127.0.0.1` and does not expose an unauthenticated inference server.
+The live demo runs the **same engine and model store on a Windows cloud server**; your browser needs no model download. It requires credentials supplied by the demo owner. In a local dashboard, choose **Execution: Cloud** on Run or Compare; your browser's built-in sign-in prompt authenticates the fixed HTTPS relay. No credential is placed in page code. The local dashboard stays on `127.0.0.1` and does not expose an unauthenticated inference server. On the hosted dashboard, Cloud is selected and Local requires a separate local installation.
 
 [How it works](#how-it-works) · [Laptop evidence](#recorded-laptop-results) · [Task-success evaluation](docs/TASK_BENCHMARK.md) · [Cloud results](#cloud-deployment-and-results) · [Verify locally](#verify-without-downloading-the-model) · [Full Qwen setup](#use-the-full-qwen-model) · [Tests and evidence](#tests-and-evidence) · [Ownership and limits](#ownership-and-limits)
 

@@ -1,9 +1,15 @@
 # Protected Windows deployment
 
 The cloud serves the existing Run / Compare / Evidence dashboard and the actual
-ExpertRelay-derived LeanMoE engine with the Qwen int8 store. There is no external
-inference API. The Cloud tab links to the authenticated server; it does not run
-remote inference on the visitor's computer. Historical laptop evidence is unchanged.
+ExpertRelay-derived LeanMoE engine with the Qwen int8 store. There is no third-party
+inference API. Run and Compare share an Execution selector. On the local dashboard,
+Cloud uses a fixed-origin, verified-HTTPS loopback relay and the browser's Basic
+sign-in prompt; credentials are forwarded per request but never stored or placed
+in JavaScript. The cloud's signed visitor cookie stays in the local relay memory,
+separated by an HttpOnly loopback session cookie. The hosted dashboard selects
+Cloud directly; Local requires a separate local installation. Cloud inference
+runs on the server, never on the visitor's computer. Historical laptop evidence
+is unchanged and separate from live measurements.
 Cloud access is useful without a speedup claim.
 
 ## Existing configuration and costs
@@ -153,7 +159,7 @@ stored access policy or rotating the signing storage key; deletion of a dedicate
 transfer account also invalidates its endpoint. Confirm absence using Azure and
 an endpoint check. Unrelated administrator/visitor passwords need no rotation if
 they were not exposed. Credentials must be delivered to visitors privately by
-the owner; no credentials belong in the Cloud tab or reports.
+the owner; no credentials belong in browser code or reports.
 
 To stop compute, deallocate the existing VM through Azure and verify
 `PowerState/deallocated`; an OS shutdown alone can keep compute billable. For

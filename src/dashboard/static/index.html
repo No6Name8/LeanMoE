@@ -34,10 +34,18 @@
   <button role="tab" id="tab-run" aria-controls="panel-run" aria-selected="true">Run</button>
   <button role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false" tabindex="-1">Compare</button>
   <button role="tab" id="tab-evidence" aria-controls="panel-evidence" aria-selected="false" tabindex="-1">Evidence</button>
-  <button role="tab" id="tab-cloud" aria-controls="panel-cloud" aria-selected="false" tabindex="-1">Cloud</button>
 </nav>
 
 <main>
+  <div class="execution-bar" id="execution-bar">
+    <strong>Execution</strong>
+    <div class="segmented" role="radiogroup" aria-label="Execution location">
+      <button type="button" role="radio" data-group="location" data-value="local" aria-checked="true">Local</button>
+      <button type="button" role="radio" data-group="location" data-value="cloud" aria-checked="false">Cloud</button>
+    </div>
+    <span id="execution-help" class="hint">Local runs on this computer. Cloud requires private credentials and runs on the protected server.</span>
+    <a class="hint" href="https://github.com/No6Name8/LeanMoE#verify-without-downloading-the-model" target="_blank" rel="noopener noreferrer">Local setup</a>
+  </div>
   <p id="engine-availability" class="hint" role="status" hidden></p>
   <details class="details settings" id="settings">
     <summary>Settings</summary>
@@ -62,8 +70,8 @@
           <span class="model-chip" id="run-model-chip">Qwen</span>
         </div>
         <div class="choice">
-          <span class="choice-label">Execution</span>
-          <div class="segmented" role="radiogroup" aria-label="Execution">
+          <span class="choice-label">Method</span>
+          <div class="segmented" role="radiogroup" aria-label="Inference method">
             <button type="button" role="radio" data-group="mode" data-value="cached" aria-checked="true">LeanMoE</button>
             <button type="button" role="radio" data-group="mode" data-value="mmap" aria-checked="false">Windows paging</button>
           </div>
@@ -185,6 +193,7 @@
         </div>
       </div>
       <div class="statusline"><span id="cmp-state" class="state idle">Idle</span><span id="cmp-confirm" class="confirm" hidden></span><span id="cmp-error" class="error" role="alert"></span></div>
+      <p class="hint" id="cmp-live-location">Live measurements will identify the selected backend.</p>
       <ol class="steps" id="cmp-steps">
         <li data-run="cached"><span class="step-name">LeanMoE</span> <span class="step-state">Waiting</span></li>
         <li data-run="mmap"><span class="step-name">Windows paging</span> <span class="step-state">Waiting</span></li>
@@ -239,20 +248,6 @@
       <pre>powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup.ps1
 .\.venv\Scripts\python.exe -m pytest</pre>
     </details>
-  </section>
-  <section id="panel-cloud" role="tabpanel" aria-labelledby="tab-cloud" class="tabpanel" hidden>
-    <div class="card">
-      <h2>LeanMoE in your browser</h2>
-      <p>The same LeanMoE engine and Qwen store run on a Windows cloud server. Enter a prompt, compare LeanMoE with Windows paging on that server, and inspect real measurements.</p>
-      <p id="cloud-location" class="hint">Opening the cloud demo moves execution to the server. It does not run cloud inference on your computer.</p>
-      <p><a class="primary cloud-link" href="https://leanmoe-demo-1.eastus.cloudapp.azure.com/" target="_blank" rel="noopener noreferrer">Open cloud demo</a></p>
-      <p class="hint">Credentials are required; request them from the operator. One active job, no queue. Cloud speedup is not established. Recorded laptop evidence remains separate from live server results.</p>
-      <details class="details compact"><summary>Download and run locally</summary>
-        <p><a href="https://github.com/No6Name8/LeanMoE#readme" target="_blank" rel="noopener noreferrer">Source and Windows setup instructions</a> · <a href="https://github.com/No6Name8/LeanMoE/blob/main/deploy/README.md" target="_blank" rel="noopener noreferrer">Deployment, recovery and shutdown</a></p>
-        <p class="hint">Local use requires the model store to be downloaded or built and its location configured. Model weights are not included in the repository.</p>
-      </details>
-      <p id="cloud-version" class="hint"></p>
-    </div>
   </section>
 </main>
 

@@ -84,6 +84,7 @@ def start(env, cookie, on_event=None):
 
 
 def test_proxy_auth_cookie_and_origin_are_required(protected):
+    assert call(protected, path="/cloud/api/status")[0] == 404  # no outbound relay on the hosted backend
     assert call(protected, **{"X-LeanMoE-Proxy-Key": "bad"})[0] == 401
     assert call(protected, user="unlisted")[0] == 401
     c = session(protected)

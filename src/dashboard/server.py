@@ -40,6 +40,7 @@ from src.engine.cache.expert_cache import CachedExpertSource
 from src.engine.paths import MODELS_ROOT
 from src.dashboard.evidence import recorded_evidence, ARTIFACT_LABELS
 from src.dashboard.access import ProxyAccess
+from src.dashboard.cloud import CloudProxy, SESSION_COOKIE
 from src.dashboard.system import snapshot, optional
 from src.dashboard.resources import ResourceUnavailable
 
@@ -520,7 +521,7 @@ class Engine:
         }
 
 
-def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None):
+def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None, cloud: CloudProxy | None = None):
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
     allowed_origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
     if access is not None:
@@ -562,9 +563,9 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None):
                 self.send_header("Set-Cookie", self.session_cookie)
             self.end_headers()
 
-        def _json(self, status: int, payload: dict) -> None:
+        def _json(self, status: int, payload: dict, extra: dict | None = None) -> None:
             body = json.dumps(payload).encode("utf-8")
-            self._headers(status, "application/json; charset=utf-8", {"Content-Length": str(len(body))})
+            self._headers(status, "application/json; charset=utf-8", {"Content-Length": str(len(body)), **(extra or {})})
             self.wfile.write(body)
 
         def _host_ok(self) -> bool:
@@ -573,12 +574,54 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None):
                 return False
             return True
 
+        def _cloud(self, method: str, path: str, raw: bytes = b"") -> None:
+            if cloud is None:
+                return self._json(HTTPStatus.NOT_FOUND, {"error": "Cloud relay is available on the local dashboard only"})
+            if method == "POST" and (self.headers.get("Origin") not in allowed_origins or
+                                     not (self.headers.get("Content-Type") or "").startswith("application/json")):
+                return self._json(HTTPStatus.FORBIDDEN, {"error": "same-origin JSON request required"})
+            try:
+                conn, response, payload, token = cloud.open(method, path, raw, self.headers.get("Authorization", ""),
+                                                              self.headers.get("Cookie", ""))
+            except PermissionError as e:
+                return self._json(HTTPStatus.UNAUTHORIZED, {"error": str(e)},
+                                  {"WWW-Authenticate": 'Basic realm="LeanMoE Cloud"'})
+            except ValueError as e:
+                return self._json(HTTPStatus.BAD_GATEWAY, {"error": str(e)})
+            except (OSError, TimeoutError):
+                return self._json(HTTPStatus.BAD_GATEWAY, {"error": "Cloud server unavailable; retry later"})
+            try:
+                extra = {}
+                if token:
+                    extra["Set-Cookie"] = (f"{SESSION_COOKIE}={token}; Path=/cloud/; HttpOnly; SameSite=Strict; "
+                                           "Max-Age=7200")
+                if response.status == HTTPStatus.UNAUTHORIZED:
+                    extra["WWW-Authenticate"] = 'Basic realm="LeanMoE Cloud"'
+                ctype = response.getheader("Content-Type", "application/json; charset=utf-8")
+                if ctype not in ("application/json; charset=utf-8", "text/event-stream; charset=utf-8"):
+                    ctype = "application/json; charset=utf-8"
+                if payload is not None:
+                    extra["Content-Length"] = str(len(payload))
+                self._headers(response.status, ctype, extra)
+                if payload is not None:
+                    self.wfile.write(payload)
+                else:
+                    while chunk := response.read1(4096):
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+                pass  # closing the upstream connection cancels a disconnected stream
+            finally:
+                conn.close()
+
         def do_GET(self) -> None:  # noqa: N802
             if not self._host_ok():
                 return
+            path = self.path.split("?", 1)[0]
+            if path == "/cloud/api/status":
+                return self._cloud("GET", "/api/status")
             if not self._identity(create=True):
                 return
-            path = self.path.split("?", 1)[0]
             if path == "/api/status":
                 status = engine.status()
                 if access is not None:
@@ -635,6 +678,9 @@ def make_handler(engine: Engine, port: int, access: ProxyAccess | None = None):
             raw = self.rfile.read(length)
             if not self._host_ok():
                 return
+            path = self.path.split("?", 1)[0]
+            if path.startswith("/cloud/api/"):
+                return self._cloud("POST", path[len("/cloud"):], raw)
             if not self._identity():
                 return
             origin = self.headers.get("Origin")
@@ -768,7 +814,7 @@ class LocalServer(ThreadingHTTPServer):
         super().server_bind()
 
 
-def serve(port: int = DEFAULT_PORT, models_root: Path | None = None, *, execution_location: str = "local", access: ProxyAccess | None = None) -> tuple[ThreadingHTTPServer, Engine]:
+def serve(port: int = DEFAULT_PORT, models_root: Path | None = None, *, execution_location: str = "local", access: ProxyAccess | None = None, cloud_origin: str | None = None) -> tuple[ThreadingHTTPServer, Engine]:
     """Bind 127.0.0.1:port (0 = any free port) and return the server and its engine."""
     if port:
         import socket
@@ -783,7 +829,8 @@ def serve(port: int = DEFAULT_PORT, models_root: Path | None = None, *, executio
         raise ValueError("protected deployment requires explicit server execution location")
     engine = Engine(models_root, execution_location)
     server = LocalServer((HOST, port), BaseHTTPRequestHandler)
-    server.RequestHandlerClass = make_handler(engine, server.server_address[1], access)  # the port actually bound
+    cloud = CloudProxy(cloud_origin) if cloud_origin else CloudProxy() if execution_location == "local" else None
+    server.RequestHandlerClass = make_handler(engine, server.server_address[1], access, cloud)  # the port actually bound
     server.connection_slots = threading.BoundedSemaphore(16) if access else None
     server.daemon_threads = True
     return server, engine
